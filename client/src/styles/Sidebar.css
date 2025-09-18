@@ -1,0 +1,75 @@
+.sidebar {
+  width: 240px;
+  background-color: #2f3c7e;
+  color: #fff;
+  min-height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 70px;
+}
+
+.sidebar .toggle-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 15px;
+  text-align: left;
+}
+
+.sidebar .logo-container {
+  text-align: center;
+  padding: 15px 0;
+}
+
+.sidebar-logo {
+  width: 140px;
+  transition: opacity 0.3s;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar .nav {
+  display: flex;
+  flex-direction: column;
+  padding: 0 10px;
+}
+
+.sidebar .nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  color: #d1d5db;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sidebar .nav a:hover {
+  background-color: #3f4c9d;
+  color: #fff;
+}
+
+.sidebar .nav a.active {
+  background-color: #4752c4;
+  color: #fff;
+  font-weight: 500;
+}
+
+.sidebar.collapsed .nav a span {
+  display: none;  /* hide text when collapsed */
+}
