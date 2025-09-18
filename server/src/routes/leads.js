@@ -1,43 +1,60 @@
 import express from "express";
 import Lead from "../models/Lead.js";
-import { auth } from "../middleware/auth.js";
-import { listWithPagination } from "../utils/paginate.js";
 const router = express.Router();
 
-router.get("/", auth, async (req,res,next)=>{
-  try{
-    const { status, q, page=1, limit=10 } = req.query;
-    const cond = {};
-    if (status) cond.status = status;
-    if (q) cond.$or = [
-      { name: {$regex: q, $options:"i"} },
-      { mobile: {$regex: q, $options:"i"} },
-      { email: {$regex: q, $options:"i"} },
-      { source: {$regex: q, $options:"i"} }
-    ];
-    const data = await listWithPagination(Lead, cond, { page, limit });
-    res.json(data);
-  }catch(e){ next(e); }
+// GET all leads (with pagination & search)
+router.get("/", async (req, res) => {
+  try {
+    const { page = 1, q = "" } = req.query;
+    const limit = 10;
+    const filter = q ? { name: { $regex: q, $options: "i" } } : {};
+    const total = await Lead.countDocuments(filter);
+    const items = await Lead.find(filter)
+      .populate("assignedTo", "name email")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.json({ items, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post("/", auth, async (req,res,next)=>{
-  try{ const lead = await Lead.create(req.body); res.status(201).json(lead); }
-  catch(e){ next(e); }
+// POST create lead
+router.post("/", async (req, res) => {
+  try {
+    const lead = new Lead(req.body);
+    await lead.save();
+    res.json(lead);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
-router.get("/:id", auth, async (req,res,next)=>{
-  try{ const lead = await Lead.findById(req.params.id); res.json(lead); }
-  catch(e){ next(e); }
+// PUT assign lead
+router.put("/:id/assign", async (req, res) => {
+  try {
+    const { assignedTo } = req.body;
+    const lead = await Lead.findByIdAndUpdate(
+      req.params.id,
+      { assignedTo, status: "assigned" },
+      { new: true }
+    ).populate("assignedTo", "name email");
+    res.json(lead);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
-router.put("/:id", auth, async (req,res,next)=>{
-  try{ const lead = await Lead.findByIdAndUpdate(req.params.id, req.body, {new:true}); res.json(lead); }
-  catch(e){ next(e); }
-});
-
-router.delete("/:id", auth, async (req,res,next)=>{
-  try{ await Lead.findByIdAndUpdate(req.params.id, { status: "deleted" }); res.json({ok:true}); }
-  catch(e){ next(e); }
+// GET single lead
+router.get("/:id", async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id).populate("assignedTo", "name email");
+    res.json(lead);
+  } catch (err) {
+    res.status(404).json({ error: "Lead not found" });
+  }
 });
 
 export default router;
