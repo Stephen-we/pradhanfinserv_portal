@@ -5,18 +5,23 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true, select: false },
-  role: { type: String, enum: ["admin","manager","officer","viewer"], default: "viewer" },
+  role: { type: String, enum: ["superadmin", "admin", "manager", "officer", "viewer"], default: "viewer" },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
-UserSchema.pre("save", async function(next){
+/**
+ * Hash password before saving if modified
+ */
+UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
-UserSchema.methods.comparePassword = function(candidate){
+/**
+ * Compare candidate password with hashed password
+ */
+UserSchema.methods.comparePassword = async function (candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 

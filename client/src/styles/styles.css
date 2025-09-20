@@ -84,3 +84,103 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   padding: 22px 26px;
   width: 100%;
 }
+
+
+/* ====== MODALS ====== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.55); /* dark translucent backdrop */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.25s ease;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.modal.green h3 { color: #16a34a; } /* success green */
+.modal.red h3 { color: #dc2626; }   /* danger red */
+
+.modal .actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* Progress feedback look */
+.btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Small fade animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ====== LOGIN PAGE ====== */
+.login-page {
+  display: flex;
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+.login-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  background: #fff;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.login-left .logo {
+  width: 200px;
+  margin-bottom: 20px;
+}
+
+.login-left form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.login-right {
+  flex: 1.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  overflow: hidden;
+  position: relative;
+}
+
+.carousel-img {
+  width: 100%;
+  height: 100vh;
+  object-fit: cover;
+  transition: opacity 1s ease-in-out;
+}
