@@ -9,13 +9,16 @@ import {
   FiGitBranch,
   FiShield,
   FiLogIn,
-  FiMenu
+  FiMenu,
+  FiChevronDown,
+  FiChevronRight
 } from "react-icons/fi";
 import logo from "../assets/logo.png";
 import "../styles/Sidebar.css";
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [openLeads, setOpenLeads] = useState(false); // submenu state
   const isAuthed = !!localStorage.getItem("token");
 
   return (
@@ -35,7 +38,29 @@ export default function Sidebar() {
         {isAuthed ? (
           <>
             <NavLink to="/dashboard"><FiLayout /> <span>Dashboard</span></NavLink>
-            <NavLink to="/leads"><FiUsers /> <span>Leads</span></NavLink>
+
+            {/* Leads with submenu */}
+            <div className="submenu">
+              <button
+                className="submenu-btn"
+                onClick={() => setOpenLeads(!openLeads)}
+              >
+                <FiUsers /> <span>Leads</span>
+                {openLeads ? (
+                  <FiChevronDown className="chevron" />
+                ) : (
+                  <FiChevronRight className="chevron" />
+                )}
+              </button>
+              {openLeads && (
+                <div className="submenu-links">
+                  <NavLink to="/leads">Free Pool</NavLink>
+                  <NavLink to="/leads/archived">Archived Leads</NavLink>
+                  <NavLink to="/leads/deleted">Deleted Leads</NavLink>
+                </div>
+              )}
+            </div>
+
             <NavLink to="/customers"><FiUser /> <span>Customer Management</span></NavLink>
             <NavLink to="/cases"><FiDatabase /> <span>Loan Cases</span></NavLink>
             <NavLink to="/partners"><FiShare2 /> <span>Channel Partner</span></NavLink>

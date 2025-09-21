@@ -1,42 +1,45 @@
 import mongoose from "mongoose";
+import Counter from "./Counter.js";
 
-const LeadSchema = new mongoose.Schema({
-  leadId: { type: String, unique: true }, // auto-generated
-  name: { type: String, required: true },
-  mobile: { type: String, required: true },
-  email: { type: String },
-  source: { type: String }, // channel partner, walk-in, etc.
+const LeadSchema = new mongoose.Schema(
+  {
+    // Core
+    name: { type: String, required: true },
+    mobile: { type: String, required: true },
+    email: String,
 
-  leadType: { type: String, enum: ["Loan", "Insurance", "Real Estate"], default: "Loan" },
-  subType: { type: String }, // e.g. Home Loan, Car Loan
+    // Meta
+    source: String,
 
-  requirementAmount: { type: Number },
-  sanctionedAmount: { type: Number },
-  gdStatus: { type: String, enum: ["Pending", "In Progress", "Completed"], default: "Pending" },
+    // Business
+    leadId: { type: String, unique: true }, // sequential & unique (never reused)
+    leadType: { type: String, enum: ["Loan", "Insurance", "Real Estate"], default: "Loan" },
+    subType: String,
+    gdStatus: { type: String, enum: ["Pending", "In Progress", "Completed"], default: "Pending" },
+    branch: String,
 
-  status: { type: String, enum: ["free_pool", "assigned", "archived", "deleted"], default: "free_pool" },
-  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    requirementAmount: Number,
+    sanctionedAmount: Number,
 
-  branch: { type: String },
-  notes: { type: String }
-}, { timestamps: true });
+    status: { type: String, enum: ["free_pool", "assigned", "archived", "deleted"], default: "free_pool" },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-/**
- * Auto-generate unique leadId per day
- * Format: LEAD-YYYYMMDD-0001
- */
+    notes: String,
+  },
+  {
+    timestamps: { currentTime: () => new Date() }, // ✅ createdAt & updatedAt auto
+  }
+);
+
+// ✅ Sequential ID (LEAD-000001, LEAD-000002, ...), never reused
 LeadSchema.pre("save", async function (next) {
   if (!this.leadId) {
-    const datePrefix = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-
-    const countToday = await mongoose.model("Lead").countDocuments({
-      createdAt: {
-        $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-        $lt: new Date(new Date().setHours(23, 59, 59, 999)),
-      },
-    });
-
-    this.leadId = `LEAD-${datePrefix}-${(countToday + 1).toString().padStart(4, "0")}`;
+    const counter = await Counter.findOneAndUpdate(
+      { name: "lead" },
+      { $inc: { seq: 1 } },
+      { upsert: true, new: true }
+    );
+    this.leadId = `LEAD-${String(counter.seq).padStart(6, "0")}`;
   }
   next();
 });

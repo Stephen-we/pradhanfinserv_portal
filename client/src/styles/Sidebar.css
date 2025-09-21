@@ -73,3 +73,138 @@
 .sidebar.collapsed .nav a span {
   display: none;  /* hide text when collapsed */
 }
+
+/* ===== SUBMENU STYLING ===== */
+.submenu {
+  margin-bottom: 10px;
+}
+
+.submenu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 15px;
+  border-radius: 6px;
+  color: #d1d5db;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.submenu-header:hover {
+  background-color: #3f4c9d;
+  color: #fff;
+}
+
+.submenu-links {
+  margin-left: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.submenu-links a {
+  padding: 8px 12px;
+  color: #d1d5db;
+  font-size: 13px;
+  text-decoration: none;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  transition: all 0.2s ease;
+}
+
+.submenu-links a:hover {
+  background-color: #3f4c9d;
+  color: #fff;
+}
+
+.submenu-links a.active {
+  background-color: #4752c4;
+  color: #fff;
+  font-weight: 500;
+}
+
+.rotate {
+  transform: rotate(180deg);
+  transition: transform 0.3s ease;
+}
+
+/* Handle collapsed sidebar (hide submenu text) */
+.sidebar.collapsed .submenu-links {
+  display: none;
+}
+
+/* Submenu container */
+.submenu {
+  display: flex;
+  flex-direction: column;
+}
+
+.submenu-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: #d1d5db;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.submenu-btn:hover {
+  background-color: #3f4c9d;
+  color: #fff;
+}
+
+.submenu-links {
+  display: flex;
+  flex-direction: column;
+  margin-left: 28px; /* indent sublinks */
+}
+
+.submenu-links a {
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #d1d5db;
+  font-size: 13px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.submenu-links a:hover,
+.submenu-links a.active {
+  background-color: #4752c4;
+  color: #fff;
+}
+
+.submenu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* push chevron to the right */
+  gap: 10px;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: #d1d5db;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.submenu-btn:hover {
+  background-color: #3f4c9d;
+  color: #fff;
+}
+
+.submenu-btn .chevron {
+  margin-left: auto; /* keep arrow at far right */
+}
+
