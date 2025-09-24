@@ -1,13 +1,16 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { auth } from "../middleware/auth.js"; // ✅ import middleware
 
 const router = express.Router();
 
 const sign = (user) =>
-  jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || "dev", {
-    expiresIn: "12h",
-  });
+  jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET || "dev",
+    { expiresIn: "12h" }
+  );
 
 // === REGISTER (public signup for now) ===
 router.post("/register", async (req, res, next) => {
@@ -55,6 +58,16 @@ router.post("/login", async (req, res, next) => {
       token,
       user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// === GET CURRENT USER (requires token) ===
+router.get("/me", auth, async (req, res, next) => {
+  try {
+    // req.user is already set in middleware (auth.js)
+    res.json(req.user);
   } catch (e) {
     next(e);
   }

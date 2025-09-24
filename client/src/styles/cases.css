@@ -1,0 +1,123 @@
+/* Container */
+.lead-form-container {
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+}
+
+/* Card style for form */
+.lead-form-card {
+  background: #fff;
+  padding: 25px 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+/* Section headers */
+.lead-form-card h3 {
+  margin: 25px 0 15px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1e3a8a;
+  border-left: 4px solid #2563eb;
+  padding-left: 8px;
+}
+
+/* Form field */
+.section {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.section label {
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #374151;
+}
+
+.section input,
+.section textarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+
+.section input:focus,
+.section textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: 0.2s;
+  border: none;
+}
+
+.btn.primary {
+  background: linear-gradient(to right, #2563eb, #3b82f6);
+  color: white;
+  font-weight: 600;
+}
+
+.btn.primary:hover {
+  background: linear-gradient(to right, #1d4ed8, #2563eb);
+}
+
+.btn.secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btn.secondary:hover {
+  background: #e5e7eb;
+}
+
+/* Add Co-Applicant button */
+.btn.add-co {
+  background: #fff;
+  border: 1px dashed #2563eb;
+  color: #2563eb;
+}
+
+.btn.add-co:hover {
+  background: #eff6ff;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin-bottom: 25px;
+}
+
+.progress-bar {
+  position: relative;
+  background: #e5e7eb;
+  border-radius: 8px;
+  height: 16px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(to right, #f59e0b, #16a34a);
+  transition: width 0.4s ease;
+}
+
+.progress-bar-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.8rem;
+  color: white;
+  font-weight: 600;
+}

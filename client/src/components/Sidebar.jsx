@@ -20,6 +20,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [openLeads, setOpenLeads] = useState(false); // submenu state
   const isAuthed = !!localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "{}"); // ✅ get user info
 
   return (
     <div className={`sidebar ${collapsed ? "collapsed" : ""}`}>
@@ -65,7 +66,11 @@ export default function Sidebar() {
             <NavLink to="/cases"><FiDatabase /> <span>Loan Cases</span></NavLink>
             <NavLink to="/partners"><FiShare2 /> <span>Channel Partner</span></NavLink>
             <NavLink to="/branches"><FiGitBranch /> <span>Bank Branch</span></NavLink>
-            <NavLink to="/users"><FiShield /> <span>User Management</span></NavLink>
+
+            {/* ✅ Only admin & superadmin see User Management */}
+            {(user.role === "admin" || user.role === "superadmin") && (
+              <NavLink to="/users"><FiShield /> <span>User Management</span></NavLink>
+            )}
           </>
         ) : (
           <NavLink to="/login"><FiLogIn /> <span>Login</span></NavLink>

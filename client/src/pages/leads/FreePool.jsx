@@ -32,28 +32,34 @@ function timeAgo(date) {
     })}`;
   }
   if (day < 30) return `${day} day${day > 1 ? "s" : ""} ago`;
-  if (day < 365) return `${Math.floor(day / 30)} month${Math.floor(day / 30) > 1 ? "s" : ""} ago`;
-  return `${Math.floor(day / 365)} year${Math.floor(day / 365) > 1 ? "s" : ""} ago`;
+  if (day < 365)
+    return `${Math.floor(day / 30)} month${
+      Math.floor(day / 30) > 1 ? "s" : ""
+    } ago`;
+  return `${Math.floor(day / 365)} year${
+    Math.floor(day / 365) > 1 ? "s" : ""
+  } ago`;
 }
 
 function FreePool() {
   const navigate = useNavigate();
   const [state, setState] = useState({ items: [], page: 1, pages: 1, q: "" });
-  const role = (JSON.parse(localStorage.getItem("user") || "{}").role) || "";
+  const role = JSON.parse(localStorage.getItem("user") || "{}").role || "";
 
   const load = () => {
     API.get("/leads", {
       params: { page: state.page, q: state.q, status: "free_pool" },
     })
       .then((r) => {
-        // ✅ Always ensure newest first
-        const sorted = (r.data.items || []).sort(
+        // ✅ Adjust for pagination response
+        const leads = r.data.docs || r.data.items || r.data || [];
+        const sorted = leads.sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
         setState((s) => ({
           ...s,
           items: sorted,
-          pages: r.data.pages || 1,
+          pages: r.data.pages || r.data.totalPages || 1,
         }));
       })
       .catch((err) => console.error("❌ Error loading leads:", err));
@@ -90,7 +96,10 @@ function FreePool() {
 
       <DataTable
         columns={[
-          { header: "Sr.No.", accessor: (row, i) => (state.page - 1) * 10 + i + 1 },
+          {
+            header: "Sr.No.",
+            accessor: (row, i) => (state.page - 1) * 10 + i + 1,
+          },
           {
             header: "Date",
             accessor: (row) =>
@@ -98,21 +107,23 @@ function FreePool() {
                 ? new Date(row.createdAt).toLocaleDateString()
                 : "-",
           },
-          {
-            header: "Aging",
-            accessor: (row) => timeAgo(row.createdAt), // ✅ exact relative time
-          },
+          { header: "Aging", accessor: (row) => timeAgo(row.createdAt) },
           {
             header: "Lead ID",
             accessor: (row, i, exportMode) =>
-              exportMode ? row.leadId : (
+              exportMode ? (
+                row.leadId
+              ) : (
                 <span
                   style={{
                     color: "#2563eb",
                     cursor: "pointer",
                     textDecoration: "underline",
+                    display: "flex",
+                    alignItems: "center",
+                    height: "100%",
                   }}
-                  onClick={() => navigate(`/leads/${row._id}/view`)}
+                  onClick={() => navigate(`/leads/view/${row._id}`)} // ✅ fixed
                 >
                   {row.leadId}
                 </span>

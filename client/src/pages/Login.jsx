@@ -1,4 +1,6 @@
+// client/src/pages/Login.jsx
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import logo from "../assets/logo.png";
 import img1 from "../assets/1.png";
@@ -17,6 +19,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [current, setCurrent] = useState(0);
+  const navigate = useNavigate();
 
   // ✅ Auto rotation
   useEffect(() => {
@@ -37,7 +40,7 @@ export default function Login() {
       const { data } = await API.post("/auth/login", { email, password });
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      location.href = "/dashboard";
+      navigate("/dashboard");   // ✅ cleaner redirect
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     }
@@ -58,6 +61,7 @@ export default function Login() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
           </div>
 
@@ -69,6 +73,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
             />
           </div>
 

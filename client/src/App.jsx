@@ -1,6 +1,6 @@
-// client/src/App.jsx
 import React from "react";
 import { Routes, Route } from "react-router-dom";
+
 import FreePool from "./pages/leads/FreePool";
 import ArchivedLeads from "./pages/leads/ArchivedLeads";
 import DeletedLeads from "./pages/leads/DeletedLeads";
@@ -15,47 +15,167 @@ import Branches from "./pages/Branches";
 import { Protected } from "./components/Protected";
 import ViewLead from "./pages/leads/ViewLead";
 import LeadForm from "./pages/LeadForm";
-import Sidebar from "./components/Sidebar";
 import ViewBranch from "./pages/ViewBranch";
 import EditBranch from "./pages/EditBranch";
+import ViewLeadCase from "./pages/cases/ViewLeadCase";
+import LeadFormCase from "./pages/cases/LeadFormCase";
+import CaseTasks from "./pages/cases/CaseTasks";
 
-
+// Layouts
+import MainLayout from "./layouts/MainLayout";
+import AuthLayout from "./layouts/AuthLayout";
 
 export default function App() {
   return (
-    <div className="app">
-      <Sidebar />
-      <div className="content">
-        <Routes>
-          {/* Public */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={<AuthLayout><Login /></AuthLayout>} />
+      <Route path="/signup" element={<AuthLayout><Signup /></AuthLayout>} />
 
-          {/* Protected */}
-          <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-          <Route path="/users" element={<Protected roles={['admin','superadmin']}><Users /></Protected>} />
+      {/* Protected Routes with Main Layout */}
+      <Route
+        path="/dashboard"
+        element={
+          <Protected>
+            <MainLayout><Dashboard /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route path="/cases/:id/tasks" element={<CaseTasks />} />
 
-          {/* Leads */}
-          <Route path="/leads" element={<Protected><FreePool /></Protected>} />
-          <Route path="/leads/new" element={<Protected><LeadForm /></Protected>} />
-          <Route path="/leads/:id/view" element={<Protected><ViewLead /></Protected>} />
-          <Route path="/leads/:id/edit" element={<Protected><LeadForm /></Protected>} />
-          <Route path="/leads/archived" element={<Protected><ArchivedLeads /></Protected>} />
-          <Route path="/leads/deleted" element={<Protected><DeletedLeads /></Protected>} />
-          <Route path="/customers" element={<Protected><Customers /></Protected>} />
-          <Route path="/cases" element={<Protected><Cases /></Protected>} />
-          <Route path="/partners" element={<Protected><Partners /></Protected>} />
-          <Route path="/branches" element={<Protected><Branches /></Protected>} />
-          <Route path="/branches/:id/view" element={<Protected><ViewBranch /></Protected>} />
-          <Route
-          path="/branches/:id/edit"element={<Protected><EditBranch /></Protected>}/>
+      <Route
+        path="/users"
+        element={
+          <Protected roles={["admin", "superadmin"]}>
+            <MainLayout><Users /></MainLayout>
+          </Protected>
+        }
+      />
 
+      {/* Leads */}
+      <Route
+        path="/leads"
+        element={
+          <Protected>
+            <MainLayout><FreePool /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/leads/new"
+        element={
+          <Protected>
+            <MainLayout><LeadForm /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/leads/view/:id"
+        element={
+          <Protected>
+            <MainLayout><ViewLead /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/leads/:id/edit"
+        element={
+          <Protected>
+            <MainLayout><LeadForm /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/leads/archived"
+        element={
+          <Protected>
+            <MainLayout><ArchivedLeads /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/leads/deleted"
+        element={
+          <Protected>
+            <MainLayout><DeletedLeads /></MainLayout>
+          </Protected>
+        }
+      />
 
+      {/* Customers */}
+      <Route
+        path="/customers"
+        element={
+          <Protected>
+            <MainLayout><Customers /></MainLayout>
+          </Protected>
+        }
+      />
 
-          {/* Fallback */}
-          <Route path="*" element={<Login />} />
-        </Routes>
-      </div>
-    </div>
+      {/* Cases */}
+      <Route
+        path="/cases"
+        element={
+          <Protected>
+            <MainLayout><Cases /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/cases/:id/view"
+        element={
+          <Protected>
+            <MainLayout><ViewLeadCase /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/cases/:id/edit"
+        element={
+          <Protected>
+            <MainLayout><LeadFormCase /></MainLayout>
+          </Protected>
+        }
+      />
+
+      {/* Partners */}
+      <Route
+        path="/partners"
+        element={
+          <Protected>
+            <MainLayout><Partners /></MainLayout>
+          </Protected>
+        }
+      />
+
+      {/* Branches */}
+      <Route
+        path="/branches"
+        element={
+          <Protected>
+            <MainLayout><Branches /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/branches/:id/view"
+        element={
+          <Protected>
+            <MainLayout><ViewBranch /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/branches/:id/edit"
+        element={
+          <Protected>
+            <MainLayout><EditBranch /></MainLayout>
+          </Protected>
+        }
+      />
+
+      {/* Fallback */}
+      <Route path="*" element={<AuthLayout><Login /></AuthLayout>} />
+    </Routes>
   );
 }

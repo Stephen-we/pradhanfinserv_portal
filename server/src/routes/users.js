@@ -1,6 +1,7 @@
 import express from "express";
 import User from "../models/User.js";
-import { auth, allowRoles } from "../middleware/auth.js";
+import { auth } from "../middleware/auth.js";
+import { allowRoles } from "../middleware/roles.js"; // ✅ FIXED
 
 const router = express.Router();
 

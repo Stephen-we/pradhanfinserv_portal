@@ -1,3 +1,4 @@
+// server/src/serve.js
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -16,6 +17,7 @@ import partnerRoutes from "./routes/partners.js";
 import branchRoutes from "./routes/branches.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import customerDocs from "./routes/customerDocs.js";
+import taskRoutes from "./routes/tasks.js";
 
 dotenv.config();
 const app = express();
@@ -64,6 +66,9 @@ app.use("/api/partners", partnerRoutes);
 app.use("/api/branches", branchRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/customer-docs", customerDocs);
+
+// ✅ mount tasks AFTER middleware (CORS/JSON) like the others
+app.use("/api/tasks", taskRoutes);
 
 // ---- Static Uploads ----
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
