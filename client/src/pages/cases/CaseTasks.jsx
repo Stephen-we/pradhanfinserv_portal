@@ -16,16 +16,31 @@ export default function CaseTasks() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [leadInfo, setLeadInfo] = useState({ leadId: "", name: "" });
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, taskId: null, taskName: "" });
 
-  // Load tasks for this case
+  // Load lead information and tasks for this case
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const { data } = await API.get(`/tasks/case/${id}`); // ✅ no double /api
-        if (mounted) setTasks(data || []);
+        // First, get case details to fetch lead information
+        const caseResponse = await API.get(`/cases/${id}`);
+        const caseData = caseResponse.data;
+        
+        if (mounted) {
+          setLeadInfo({
+            leadId: caseData.leadId || caseData._id || id,
+            name: caseData.clientName || caseData.customerName || caseData.name || "Unknown Lead"
+          });
+        }
+
+        // Then load tasks for this case
+        const tasksResponse = await API.get(`/tasks/case/${id}`);
+        if (mounted) setTasks(tasksResponse.data || []);
       } catch (e) {
-        alert("Failed to load tasks");
+        console.error("Failed to load case information:", e);
+        alert("Failed to load case information or tasks");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -35,7 +50,7 @@ export default function CaseTasks() {
     };
   }, [id]);
 
-  // Create a new task block/table
+  // Create a new task row
   const addTask = async () => {
     try {
       const newTask = {
@@ -50,7 +65,7 @@ export default function CaseTasks() {
         actualEndDate: "",
         notes: "",
       };
-      const { data } = await API.post("/tasks", newTask); // ✅ fixed
+      const { data } = await API.post("/tasks", newTask);
       setTasks((prev) => [...prev, data]);
     } catch {
       alert("Failed to add task");
@@ -63,25 +78,61 @@ export default function CaseTasks() {
       prev.map((t) => (t._id === taskId ? { ...t, [field]: value } : t))
     );
     try {
-      await API.put(`/tasks/${taskId}`, { [field]: value }); // ✅ fixed
+      await API.put(`/tasks/${taskId}`, { [field]: value });
     } catch {
       alert("Failed to update task");
     }
   };
 
-  // Delete a task block
-  const deleteTask = async (taskId) => {
-    if (!window.confirm("Are you sure you want to delete this task?")) return;
+  // Show delete confirmation
+  const showDeleteConfirm = (taskId, taskName) => {
+    setDeleteConfirm({
+      show: true,
+      taskId: taskId,
+      taskName: taskName || "Untitled Task"
+    });
+  };
+
+  // Cancel delete
+  const cancelDelete = () => {
+    setDeleteConfirm({ show: false, taskId: null, taskName: "" });
+  };
+
+  // Confirm and delete task
+  const confirmDelete = async () => {
+    if (!deleteConfirm.taskId) return;
+    
     try {
-      await API.delete(`/tasks/${taskId}`); // ✅ fixed
-      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+      await API.delete(`/tasks/${deleteConfirm.taskId}`);
+      setTasks((prev) => prev.filter((t) => t._id !== deleteConfirm.taskId));
+      setDeleteConfirm({ show: false, taskId: null, taskName: "" });
     } catch {
       alert("Failed to delete task");
+      setDeleteConfirm({ show: false, taskId: null, taskName: "" });
     }
   };
 
   return (
     <div className="task-table-container">
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <div className="modal-overlay">
+          <div className="delete-confirm-modal">
+            <h3>Confirm Delete</h3>
+            <p>Are you sure you want to delete the task "<strong>{deleteConfirm.taskName}</strong>"?</p>
+            <p className="warning-text">This action cannot be undone.</p>
+            <div className="modal-actions">
+              <button className="btn secondary" onClick={cancelDelete}>
+                Cancel
+              </button>
+              <button className="btn danger" onClick={confirmDelete}>
+                <FiTrash2 /> Delete Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="task-header">
         <h2>Task Workflow</h2>
         <div>
@@ -102,128 +153,146 @@ export default function CaseTasks() {
       </header>
 
       {loading && <p className="no-results">Loading…</p>}
-      {!loading && tasks.length === 0 && (
-        <p className="no-results">No tasks added yet. Click "Add Task".</p>
+      
+      {/* Always show lead info header */}
+      {!loading && (
+        <div className="tasks-header-info">
+          <p><strong>Lead ID:</strong> {leadInfo.leadId}</p>
+          <p><strong>Name:</strong> {leadInfo.name}</p>
+        </div>
       )}
 
-      {!loading &&
-        tasks.map((task, idx) => (
-          <div key={task._id} className="task-block">
-            <div className="task-block-header">
-              <h3>
-                Task #{idx + 1} – {task.taskName || "Untitled"}
-              </h3>
-              <button
-                className="btn danger small"
-                onClick={() => deleteTask(task._id)}
-                title="Delete this task"
-              >
-                <FiTrash2 /> Delete
-              </button>
-            </div>
-
-            <table className="task-table">
-              <thead>
+      {!loading && (
+        <div className="task-block">
+          <table className="task-table">
+            <thead>
+              <tr>
+                <th className="sr-no-header">Sr No</th>
+                <th>Stage</th>
+                <th>Task Name</th>
+                <th>Case Owner</th>
+                <th>Status</th>
+                <th>Start Date</th>
+                <th>Planned End Date</th>
+                <th>Duration</th>
+                <th>Actual End Date</th>
+                <th className="notes-header">Notes</th>
+                <th className="action-header">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.length === 0 ? (
                 <tr>
-                  <th>Sr No</th>
-                  <th>Stage</th>
-                  <th>Task Name</th>
-                  <th>Case Owner</th>
-                  <th>Status</th>
-                  <th>Start Date</th>
-                  <th>Planned End Date</th>
-                  <th>Duration</th>
-                  <th>Actual End Date</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{idx + 1}</td>
-                  <td>
-                    <input
-                      value={task.stage || ""}
-                      onChange={(e) =>
-                        handleChange(task._id, "stage", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={task.taskName || ""}
-                      onChange={(e) =>
-                        handleChange(task._id, "taskName", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={task.caseOwner || ""}
-                      onChange={(e) =>
-                        handleChange(task._id, "caseOwner", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={task.taskStatus || "Pending"}
-                      onChange={(e) =>
-                        handleChange(task._id, "taskStatus", e.target.value)
-                      }
-                    >
-                      <option>Pending</option>
-                      <option>In Progress</option>
-                      <option>Completed</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      value={toYMD(task.startDate)}
-                      onChange={(e) =>
-                        handleChange(task._id, "startDate", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      value={toYMD(task.plannedEndDate)}
-                      onChange={(e) =>
-                        handleChange(task._id, "plannedEndDate", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={task.duration || ""}
-                      onChange={(e) =>
-                        handleChange(task._id, "duration", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      value={toYMD(task.actualEndDate)}
-                      onChange={(e) =>
-                        handleChange(task._id, "actualEndDate", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <textarea
-                      value={task.notes || ""}
-                      onChange={(e) =>
-                        handleChange(task._id, "notes", e.target.value)
-                      }
-                    />
+                  <td colSpan="11" className="empty-table-message">
+                    No tasks added yet. Click "Add Task" to create your first task.
                   </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
-        ))}
+              ) : (
+                tasks.map((task, idx) => (
+                  <tr key={task._id} className="task-row">
+                    <td className="sr-no">{idx + 1}</td>
+                    <td>
+                      <input
+                        value={task.stage || ""}
+                        onChange={(e) =>
+                          handleChange(task._id, "stage", e.target.value)
+                        }
+                        placeholder="Enter stage"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={task.taskName || ""}
+                        onChange={(e) =>
+                          handleChange(task._id, "taskName", e.target.value)
+                        }
+                        placeholder="Enter task name"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={task.caseOwner || ""}
+                        onChange={(e) =>
+                          handleChange(task._id, "caseOwner", e.target.value)
+                        }
+                        placeholder="Enter case owner"
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={task.taskStatus || "Pending"}
+                        onChange={(e) =>
+                          handleChange(task._id, "taskStatus", e.target.value)
+                        }
+                        className="status-select"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        value={toYMD(task.startDate)}
+                        onChange={(e) =>
+                          handleChange(task._id, "startDate", e.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        value={toYMD(task.plannedEndDate)}
+                        onChange={(e) =>
+                          handleChange(task._id, "plannedEndDate", e.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={task.duration || ""}
+                        onChange={(e) =>
+                          handleChange(task._id, "duration", e.target.value)
+                        }
+                        placeholder="e.g., 5 days"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        value={toYMD(task.actualEndDate)}
+                        onChange={(e) =>
+                          handleChange(task._id, "actualEndDate", e.target.value)
+                        }
+                      />
+                    </td>
+                    <td className="notes-cell">
+                      <textarea
+                        value={task.notes || ""}
+                        onChange={(e) =>
+                          handleChange(task._id, "notes", e.target.value)
+                        }
+                        placeholder="Enter notes"
+                        rows="3"
+                      />
+                    </td>
+                    <td className="action-cell">
+                      <button
+                        className="btn danger small"
+                        onClick={() => showDeleteConfirm(task._id, task.taskName)}
+                        title="Delete this task"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
