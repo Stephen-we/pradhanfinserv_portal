@@ -4,13 +4,17 @@ import Case from "../models/Case.js";
 import CaseAudit from "../models/CaseAudit.js";
 import { auth } from "../middleware/auth.js";
 import { listWithPagination } from "../utils/paginate.js";
+import { upload } from "../middleware/uploads.js"; // ⬅️ make sure this exists
 
 const router = express.Router();
 
-// ✅ List with pagination
+//
+// ✅ List with pagination + search
+//
 router.get("/", auth, async (req, res, next) => {
   try {
     const { q, page = 1, limit = 10 } = req.query;
+
     const cond = q
       ? {
           $or: [
@@ -29,19 +33,23 @@ router.get("/", auth, async (req, res, next) => {
       { path: "assignedTo", select: "name role" }
     );
 
-    res.json(data);
+    res.json(data); // { items, page, pages, total }
   } catch (e) {
     next(e);
   }
 });
 
+//
 // ✅ Get single case (normalized)
+//
 router.get("/:id", auth, async (req, res, next) => {
   try {
-    const item = await Case.findById(req.params.id).populate("assignedTo", "name role");
+    const item = await Case.findById(req.params.id).populate(
+      "assignedTo",
+      "name role"
+    );
     if (!item) return res.status(404).json({ message: "Case not found" });
 
-    // normalize response for frontend
     const response = {
       ...item.toObject(),
       customerName: item.customerName || "",
@@ -54,80 +62,71 @@ router.get("/:id", auth, async (req, res, next) => {
   }
 });
 
-// ✅ Create new case
-router.post("/", auth, async (req, res, next) => {
-  try {
-    const last = await Case.findOne().sort({ createdAt: -1 });
-    const nextId =
-      last && last.caseId
-        ? (parseInt(last.caseId, 10) + 1).toString()
-        : "25040001";
-
-    const item = await Case.create({ ...req.body, caseId: nextId });
-
-    await CaseAudit.create({
-      case: item._id,
-      actor: req.user.id,
-      action: "created",
-    });
-
-    const populated = await Case.findById(item._id).populate("assignedTo", "name role");
-    res.status(201).json(populated);
-  } catch (e) {
-    next(e);
-  }
-});
-
-// ✅ Update case (with mapping)
-router.put("/:id", auth, async (req, res, next) => {
+//
+// ✅ Update case (JSON or multipart with KYC)
+//
+router.put("/:id", auth, upload.any(), async (req, res, next) => {
   try {
     const prev = await Case.findById(req.params.id);
+    if (!prev) return res.status(404).json({ message: "Case not found" });
+
+    const body = req.body || {};
 
     const updateData = {
       // Applicant 1
-      customerName: req.body.customerName || req.body.name,
-      mobile: req.body.mobile || req.body.primaryMobile,
-      email: req.body.email,
+      customerName: body.customerName || body.name,
+      mobile: body.mobile || body.primaryMobile,
+      email: body.email,
 
       // Co-Applicant
-      applicant2Name: req.body.applicant2Name,
-      applicant2Mobile: req.body.applicant2Mobile,
-      applicant2Email: req.body.applicant2Email,
+      applicant2Name: body.applicant2Name,
+      applicant2Mobile: body.applicant2Mobile,
+      applicant2Email: body.applicant2Email,
 
       // Loan Details
-      loanType: req.body.loanType,
-      amount: req.body.amount,
-      bank: req.body.bank,
-      branch: req.body.branch,
-      status: req.body.status,
+      loanType: body.loanType,
+      amount: body.amount,
+      bank: body.bank,
+      branch: body.branch,
+      status: body.status,
 
       // Contact
-      permanentAddress: req.body.permanentAddress,
-      currentAddress: req.body.currentAddress,
-      siteAddress: req.body.siteAddress,
-      officeAddress: req.body.officeAddress,
+      permanentAddress: body.permanentAddress,
+      currentAddress: body.currentAddress,
+      siteAddress: body.siteAddress,
+      officeAddress: body.officeAddress,
 
-      // KYC
-      pan: req.body.pan,
-      aadhar: req.body.aadhar,
+      // KYC quick fields
+      pan: body.pan,
+      aadhar: body.aadhar,
 
       // Extra
-      notes: req.body.notes,
+      notes: body.notes,
 
       // Misc
-      disbursedAmount: req.body.disbursedAmount,
-      task: req.body.task,
+      disbursedAmount: body.disbursedAmount,
+      task: body.task,
     };
+
+    // 🔹 Handle uploaded KYC files
+    if (Array.isArray(req.files) && req.files.length) {
+      const kyc = new Map(prev.kycDocs || []);
+      for (const f of req.files) {
+        if (f.fieldname.startsWith("kycDoc_")) {
+          const fileUrl = f.path?.replace(/\\/g, "/");
+          kyc.set(f.fieldname, fileUrl);
+        }
+      }
+      updateData.kycDocs = kyc;
+    }
 
     const item = await Case.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
     }).populate("assignedTo", "name role");
 
-    if (!item) return res.status(404).json({ message: "Case not found" });
-
     // Audit log
-    if (req.body.status && prev.status !== req.body.status) {
+    if (body.status && prev.status !== body.status) {
       await CaseAudit.create({
         case: item._id,
         actor: req.user.id,
@@ -149,7 +148,9 @@ router.put("/:id", auth, async (req, res, next) => {
   }
 });
 
+//
 // ✅ Add comment
+//
 router.post("/:id/comment", auth, async (req, res, next) => {
   try {
     await CaseAudit.create({
@@ -164,7 +165,9 @@ router.post("/:id/comment", auth, async (req, res, next) => {
   }
 });
 
+//
 // ✅ Audit logs
+//
 router.get("/:id/audit", auth, async (req, res, next) => {
   try {
     const logs = await CaseAudit.find({ case: req.params.id })
@@ -176,7 +179,9 @@ router.get("/:id/audit", auth, async (req, res, next) => {
   }
 });
 
+//
 // ✅ Delete case
+//
 router.delete("/:id", auth, async (req, res, next) => {
   try {
     await Case.findByIdAndDelete(req.params.id);

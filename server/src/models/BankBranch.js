@@ -1,3 +1,4 @@
+// server/srcmodels/bankbranch.js 
 import mongoose from "mongoose";
 import Counter from "./Counter.js"; // ✅ reuse the same counter model you used for Leads
 

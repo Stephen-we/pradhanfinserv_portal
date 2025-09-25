@@ -1,3 +1,4 @@
+//server/src/routes/branches.js
 import express from "express";
 import Branch from "../models/BankBranch.js";
 import { auth } from "../middleware/auth.js";
@@ -54,7 +55,7 @@ router.get("/:id", auth, async (req, res, next) => {
   }
 });
 
-// 📌 Update
+// 📌 Update branch
 router.put("/:id", auth, async (req, res, next) => {
   try {
     const item = await Branch.findByIdAndUpdate(req.params.id, req.body, {
@@ -66,11 +67,33 @@ router.put("/:id", auth, async (req, res, next) => {
   }
 });
 
-// 📌 Delete
+// 📌 Delete branch
 router.delete("/:id", auth, async (req, res, next) => {
   try {
     await Branch.findByIdAndDelete(req.params.id);
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 🔹 Distinct bank names
+router.get("/banks/distinct", auth, async (req, res, next) => {
+  try {
+    const banks = await Branch.distinct("bankName");
+    res.json(banks.sort());
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 🔹 Branch names for a bank
+router.get("/banks/:bankName/branches", auth, async (req, res, next) => {
+  try {
+    const { bankName } = req.params;
+    const branches = await Branch.find({ bankName }, { branchName: 1, _id: 0 })
+      .sort({ branchName: 1 });
+    res.json(branches.map((b) => b.branchName));
   } catch (e) {
     next(e);
   }

@@ -1,3 +1,4 @@
+// client/src/pages/Cases.jsx
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import API from "../services/api";
@@ -9,26 +10,39 @@ export default function Cases() {
     page: 1,
     pages: 1,
     q: "",
-    users: [], // 👈 store assignable users
+    users: [],
   });
   const [assigningId, setAssigningId] = useState(null);
 
-  const load = () =>
-    API.get("/cases", { params: { page: state.page, q: state.q } }).then((r) =>
-      setState((s) => ({ ...s, items: r.data.items, pages: r.data.pages }))
-    );
+  // 🔹 Load cases with safe handling
+  const load = async () => {
+    try {
+      const { data } = await API.get("/cases", {
+        params: { page: state.page, q: state.q },
+      });
+      console.log("Cases API response:", data);
 
-  // Load active users once (who are playing roles on this project)
+      const items = Array.isArray(data) ? data : data.items || [];
+      const pages = Array.isArray(data) ? 1 : data.pages || 1;
+
+      setState((s) => ({ ...s, items, pages }));
+    } catch (err) {
+      console.error("Failed to load cases:", err);
+      alert("❌ Could not load cases. Check console.");
+    }
+  };
+
+  // 🔹 Load users for assignment
   const loadUsers = async () => {
     try {
       const res = await API.get("/users", { params: { active: true } });
       const data = res.data;
-      const users = Array.isArray(data) ? data : (data.items || []);
+      const users = Array.isArray(data) ? data : data.items || [];
       setState((s) => ({ ...s, users }));
-    } catch (e) {
+    } catch {
       const res = await API.get("/users");
       const data = res.data;
-      const users = Array.isArray(data) ? data : (data.items || []);
+      const users = Array.isArray(data) ? data : data.items || [];
       setState((s) => ({ ...s, users }));
     }
   };
@@ -41,6 +55,7 @@ export default function Cases() {
     loadUsers();
   }, []);
 
+  // 🔹 Change case status
   const changeStatus = async (row) => {
     const status = prompt(
       "New status (in-progress, pending-documents, approved, rejected, disbursed)",
@@ -52,6 +67,7 @@ export default function Cases() {
     }
   };
 
+  // 🔹 Add comment
   const comment = async (row) => {
     const c = prompt("Comment");
     if (c) {
@@ -60,6 +76,7 @@ export default function Cases() {
     }
   };
 
+  // 🔹 View audit trail
   const viewAudit = async (row) => {
     const { data } = await API.get(`/cases/${row._id}/audit`);
     alert(
@@ -74,12 +91,13 @@ export default function Cases() {
     );
   };
 
+  // 🔹 Assign user
   const handleAssignChange = async (row, userId) => {
     try {
       setAssigningId(row._id);
       await API.put(`/cases/${row._id}`, {
         ...row,
-        assignedTo: userId || null, // empty -> unassign
+        assignedTo: userId || null,
       });
       await load();
     } finally {
@@ -87,32 +105,30 @@ export default function Cases() {
     }
   };
 
-  // Helper to get current assigned user id from row (supports ObjectId or populated object)
+  // Helpers
   const getAssignedId = (row) => {
     if (!row?.assignedTo) return "";
     return typeof row.assignedTo === "object" ? row.assignedTo._id : row.assignedTo;
   };
 
-  // Helper to get current assigned user name for export
-  const getAssignedName = (row) => {
-    return (
-      row?.assignedTo?.name ||
-      row?.assignedName ||
-      state.users.find((u) => u._id === getAssignedId(row))?.name ||
-      ""
-    );
-  };
+  const getAssignedName = (row) =>
+    row?.assignedTo?.name ||
+    row?.assignedName ||
+    state.users.find((u) => u._id === getAssignedId(row))?.name ||
+    "";
 
   return (
     <div>
-      <header><h1>Loan Cases</h1></header>
+      <header>
+        <h1>Loan Cases</h1>
+      </header>
       <DataTable
         columns={[
           {
             header: "Case ID",
             accessor: (row) => (
               <Link to={`/cases/${row._id}/view`} style={{ color: "blue" }}>
-                {row.caseId}
+                {row.caseId || "-"}
               </Link>
             ),
           },
@@ -120,11 +136,11 @@ export default function Cases() {
           { header: "Mobile", accessor: "mobile" },
           { header: "Loan Type", accessor: "loanType" },
 
-          // 🔁 Assigned column (select from User Management)
+          // Assigned column
           {
             header: "Assigned",
             accessor: (row, _i, exportMode) => {
-              if (exportMode) return getAssignedName(row); // ✅ keeps Excel export working
+              if (exportMode) return getAssignedName(row);
               const current = getAssignedId(row);
               return (
                 <select
@@ -136,7 +152,7 @@ export default function Cases() {
                   <option value="">Unassigned</option>
                   {state.users.map((u) => (
                     <option key={u._id} value={u._id}>
-                      {u.name} {/* ✅ only name, no role */}
+                      {u.name}
                     </option>
                   ))}
                 </select>
@@ -144,20 +160,15 @@ export default function Cases() {
             },
           },
 
-          // ✅ Task column (dropdown with fixed options)
+          // Task column
           {
             header: "Task",
             accessor: (row, _i, exportMode) => {
               if (exportMode) return row.task || "";
-
               const handleTaskChange = async (value) => {
-                await API.put(`/cases/${row._id}`, {
-                  ...row,
-                  task: value,
-                });
+                await API.put(`/cases/${row._id}`, { ...row, task: value });
                 load();
               };
-
               return (
                 <select
                   value={row.task || ""}
@@ -183,9 +194,15 @@ export default function Cases() {
         onSearch={(q) => setState((s) => ({ ...s, q, page: 1 }))}
         renderActions={(row) => (
           <div style={{ display: "flex", gap: 6 }}>
-            <button className="btn" onClick={() => changeStatus(row)}>Change Status</button>
-            <button className="btn secondary" onClick={() => comment(row)}>Comment</button>
-            <button className="btn" onClick={() => viewAudit(row)}>View Audit</button>
+            <button className="btn" onClick={() => changeStatus(row)}>
+              Change Status
+            </button>
+            <button className="btn secondary" onClick={() => comment(row)}>
+              Comment
+            </button>
+            <button className="btn" onClick={() => viewAudit(row)}>
+              View Audit
+            </button>
           </div>
         )}
       />

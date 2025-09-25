@@ -3,8 +3,8 @@ import mongoose from "mongoose";
 
 const CaseSchema = new mongoose.Schema(
   {
-    caseId: { type: String, unique: true },          // sequential case id
-    leadId: { type: String },                        // cross reference to Lead
+    caseId: { type: String, unique: true },
+    leadId: { type: String },
 
     // Applicant 1
     customerName: { type: String },
@@ -20,14 +20,8 @@ const CaseSchema = new mongoose.Schema(
     loanType: {
       type: String,
       enum: [
-        "Home Loan",
-        "Personal Loan",
-        "Business Loan",
-        "Education Loan",
-        "Vehicle Loan",
-        "LAP",
-        "MSME",
-        "LRD",
+        "Home Loan","Personal Loan","Business Loan","Education Loan",
+        "Vehicle Loan","LAP","MSME","LRD",
       ],
       default: "Home Loan",
     },
@@ -42,9 +36,16 @@ const CaseSchema = new mongoose.Schema(
     siteAddress: { type: String },
     officeAddress: { type: String },
 
-    // KYC
+    // KYC (quick fields)
     pan: { type: String },
     aadhar: { type: String },
+
+    // 🔹 NEW: dynamic KYC uploads (key -> url/path)
+    kycDocs: {
+      type: Map,
+      of: String,
+      default: {},
+    },
 
     // Extra
     notes: { type: String },
