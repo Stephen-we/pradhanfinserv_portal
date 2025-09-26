@@ -1,3 +1,4 @@
+// client/src/pages/Partners.jsx
 import React, { useEffect, useState } from "react";
 import API from "../services/api";
 import DataTable from "../components/DataTable";

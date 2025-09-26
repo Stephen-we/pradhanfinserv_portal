@@ -1,3 +1,4 @@
+// server/src/routes/partners.js
 import express from "express";
 import Partner from "../models/ChannelPartner.js";
 import { auth } from "../middleware/auth.js";

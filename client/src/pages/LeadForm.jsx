@@ -13,8 +13,9 @@ const empty = {
   requirementAmount: "",
   sanctionedAmount: "",
   gdStatus: "Pending",
-  bank: "", // ✅ New field for bank selection
-  branch: "", // ✅ This will now be auto-populated based on bank
+  bank: "",
+  branch: "",
+  channelPartner: "", // ✅ New field for channel partner
   status: "free_pool",
   notes: "",
   // Address fields
@@ -35,6 +36,7 @@ export default function LeadForm() {
   const [banks, setBanks] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
+  const [channelPartners, setChannelPartners] = useState([]); // ✅ New state for channel partners
   const isEdit = Boolean(id);
 
   // ✅ Fetch all distinct banks on component mount
@@ -42,6 +44,13 @@ export default function LeadForm() {
     API.get("/branches/banks/distinct")
       .then(({ data }) => setBanks(data))
       .catch(() => console.error("Failed to load banks"));
+  }, []);
+
+  // ✅ Fetch all channel partners on component mount
+  useEffect(() => {
+    API.get("/channel-partners")
+      .then(({ data }) => setChannelPartners(data))
+      .catch(() => console.error("Failed to load channel partners"));
   }, []);
 
   // ✅ Fetch branches when bank is selected
@@ -71,6 +80,7 @@ export default function LeadForm() {
           sanctionedAmount: data.sanctionedAmount ?? "",
           bank: data.bank || "",
           branch: data.branch || "",
+          channelPartner: data.channelPartner || "", // ✅ Include channel partner
           // Address fields
           permanentAddress: data.permanentAddress || "",
           currentAddress: data.currentAddress || "",
@@ -107,6 +117,7 @@ export default function LeadForm() {
         officeAddress: form.officeAddress || null,
         pan: form.pan || null,
         aadhar: form.aadhar || null,
+        channelPartner: form.channelPartner || null, // ✅ Include channel partner in payload
       };
 
       if (isEdit) {
@@ -178,6 +189,20 @@ export default function LeadForm() {
           <option value="">-- Select Source * --</option>
           <option value="Business">Business</option>
           <option value="Non-Business">Non-Business</option>
+        </select>
+
+        {/* ✅ Channel Partner Selection */}
+        <select
+          className="input"
+          value={form.channelPartner}
+          onChange={(e) => handleInputChange('channelPartner', e.target.value)}
+        >
+          <option value="">-- Select Channel Partner --</option>
+          {channelPartners.map((partner) => (
+            <option key={partner._id} value={partner._id}>
+              {partner.name}
+            </option>
+          ))}
         </select>
 
         {/* ✅ Bank Selection */}

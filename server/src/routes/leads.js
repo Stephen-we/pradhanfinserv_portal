@@ -21,6 +21,20 @@ router.post("/", auth, async (req, res, next) => {
   }
 });
 
+  // Add this to your leads route to populate channel partner when fetching a single lead
+  router.get('/:id', async (req, res) => {
+    try {
+      const lead = await Lead.findById(req.params.id)
+        .populate('assignedTo', 'name email') // Existing population
+        .populate('channelPartner', 'name contact email'); // Add this line to populate channel partner
+      
+      if (!lead) return res.status(404).json({ message: 'Lead not found' });
+      res.json(lead);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
 /* ================================
    ✅ LIST Leads (with pagination & filters)
 ================================ */

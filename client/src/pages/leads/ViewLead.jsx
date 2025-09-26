@@ -1,113 +1,256 @@
-// client/src/pages/leads/ViewLeads.jsx
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import API from "../../services/api";
-import { FiEdit } from "react-icons/fi";
+import "../../styles/viewCase.css";
 
 export default function ViewLead() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [converting, setConverting] = useState(false);
 
-  // ✅ Load lead on mount
   useEffect(() => {
-    API.get(`/leads/${id}`)
-      .then(({ data }) => {
+    const fetchLead = async () => {
+      try {
+        const { data } = await API.get(`/leads/${id}`);
         setLead(data);
+      } catch (err) {
+        console.error("Failed to load lead:", err);
+        alert("Unable to load lead details");
+      } finally {
         setLoading(false);
-      })
-      .catch(() => {
-        alert("Unable to load lead");
-        setLoading(false);
-      });
+      }
+    };
+
+    fetchLead();
   }, [id]);
 
-  if (loading) return <p>Loading...</p>;
-  if (!lead) return <p>Lead not found</p>;
-
-  // ✅ Convert lead → archived + case
-  const convertLead = () => {
-    API.patch(`/leads/${lead._id}/convert`)
-      .then(() => {
-        alert("✅ Lead converted to Archived & Loan Case created!");
-        navigate("/cases"); // or "/leads/archived" if you prefer
-      })
-      .catch(() => alert("❌ Failed to convert lead"));
+  const convertToCase = async () => {
+    if (!window.confirm("Are you sure you want to convert this lead to a case? This action cannot be undone.")) return;
+    
+    setConverting(true);
+    try {
+      // Use the conversion logic from code B
+      await API.patch(`/leads/${id}/convert`);
+      alert("✅ Lead converted to Archived & Loan Case created!");
+      navigate("/cases"); // Navigate to cases list as in code B
+    } catch (err) {
+      alert(err.response?.data?.message || "❌ Failed to convert lead");
+    } finally {
+      setConverting(false);
+    }
   };
 
+  if (loading) return <div className="card">Loading...</div>;
+  if (!lead) return <div className="card">Lead not found</div>;
+
   return (
-    <div className="card" style={{ maxWidth: 900 }}>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <h2>View Lead</h2>
-        <FiEdit
-          style={{ cursor: "pointer" }}
-          size={22}
-          onClick={() => navigate(`/leads/${lead._id}/edit`)}
-        />
-      </header>
+    <div className="card">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <h2 style={{ margin: 0 }}>Lead Details: {lead.leadId}</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link to={`/leads/${id}/edit`} className="btn secondary">
+            Edit
+          </Link>
+          <button 
+            className="btn success" 
+            onClick={convertToCase}
+            disabled={converting}
+          >
+            {converting ? "Converting..." : "Convert to Case"}
+          </button>
+          <button className="btn" onClick={() => navigate("/leads")}>
+            Back to Leads
+          </button>
+        </div>
+      </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16,
-        }}
-      >
+      <div className="details-grid">
+        {/* Basic Information */}
+        <div className="detail-section">
+          <h3>Basic Information</h3>
+          <div className="grid-2">
+            <div className="detail-item">
+              <label>Name:</label>
+              <span>{lead.name}</span>
+            </div>
+            <div className="detail-item">
+              <label>Mobile:</label>
+              <span>{lead.mobile}</span>
+            </div>
+            <div className="detail-item">
+              <label>Email:</label>
+              <span>{lead.email || "N/A"}</span>
+            </div>
+            <div className="detail-item">
+              <label>Source:</label>
+              <span>{lead.source || "N/A"}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Channel Partner Information */}
+        <div className="detail-section">
+          <h3>Channel Partner Information</h3>
+          <div className="grid-2">
+            <div className="detail-item">
+              <label>Channel Partner:</label>
+              <span>
+                {lead.channelPartner ? (
+                  <Link to={`/partners/${lead.channelPartner._id}`} className="link">
+                    {lead.channelPartner.name}
+                  </Link>
+                ) : (
+                  "N/A"
+                )}
+              </span>
+            </div>
+            {lead.channelPartner && (
+              <>
+                <div className="detail-item">
+                  <label>Partner Contact:</label>
+                  <span>{lead.channelPartner.contact || "N/A"}</span>
+                </div>
+                <div className="detail-item">
+                  <label>Partner Email:</label>
+                  <span>{lead.channelPartner.email || "N/A"}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Bank & Branch Information */}
+        <div className="detail-section">
+          <h3>Bank & Branch Information</h3>
+          <div className="grid-2">
+            <div className="detail-item">
+              <label>Bank:</label>
+              <span>{lead.bank || "N/A"}</span>
+            </div>
+            <div className="detail-item">
+              <label>Branch:</label>
+              <span>{lead.branch || "N/A"}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Lead Details */}
-        <div>
+        <div className="detail-section">
           <h3>Lead Details</h3>
-          <p><b>Lead ID:</b> {lead.leadId}</p>
-          <p><b>Created On:</b> {new Date(lead.createdAt).toLocaleDateString()}</p>
-          <p><b>Branch:</b> {lead.branch || "-"}</p>
-          <p><b>Lead Type:</b> {lead.leadType} {lead.subType ? `- ${lead.subType}` : ""}</p>
-          <p><b>Loan Amount:</b> {lead.requirementAmount || "-"}</p>
-          <p><b>Sanctioned:</b> {lead.sanctionedAmount || "-"}</p>
-          <p><b>Status:</b> {lead.status}</p>
+          <div className="grid-2">
+            <div className="detail-item">
+              <label>Lead Type:</label>
+              <span>{lead.leadType}</span>
+            </div>
+            <div className="detail-item">
+              <label>Sub Type:</label>
+              <span>{lead.subType || "N/A"}</span>
+            </div>
+            <div className="detail-item">
+              <label>Requirement Amount:</label>
+              <span>{lead.requirementAmount ? `₹${lead.requirementAmount.toLocaleString()}` : "N/A"}</span>
+            </div>
+            <div className="detail-item">
+              <label>Sanctioned Amount:</label>
+              <span>{lead.sanctionedAmount ? `₹${lead.sanctionedAmount.toLocaleString()}` : "N/A"}</span>
+            </div>
+            <div className="detail-item">
+              <label>GD Status:</label>
+              <span className={`status-badge ${lead.gdStatus.toLowerCase().replace(' ', '-')}`}>
+                {lead.gdStatus}
+              </span>
+            </div>
+            <div className="detail-item">
+              <label>Status:</label>
+              <span className={`status-badge ${lead.status}`}>
+                {lead.status.replace('_', ' ').toUpperCase()}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Contact Details */}
-        <div>
-          <h3>Contact Details</h3>
-          <p><b>Customer Name:</b> {lead.name}</p>
-          <p><b>Mobile:</b> {lead.mobile}</p>
-          <p><b>Email:</b> {lead.email || "-"}</p>
-          <p><b>Permanent Address:</b> {lead.permanentAddress || "-"}</p>
-          <p><b>Current Address:</b> {lead.currentAddress || "-"}</p>
-          <p><b>Site Address:</b> {lead.siteAddress || "-"}</p>
-          <p><b>Office Address:</b> {lead.officeAddress || "-"}</p>
-          <p><b>PAN:</b> {lead.pan || "-"}</p>
-          <p><b>Aadhar:</b> {lead.aadhar || "-"}</p>
+        {/* Document Information */}
+        <div className="detail-section">
+          <h3>Document Information</h3>
+          <div className="grid-2">
+            <div className="detail-item">
+              <label>PAN Number:</label>
+              <span>{lead.pan || "N/A"}</span>
+            </div>
+            <div className="detail-item">
+              <label>Aadhar Number:</label>
+              <span>{lead.aadhar || "N/A"}</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Notes */}
-      <div style={{ marginTop: 20 }}>
-        <h3>Notes</h3>
-        <p>{lead.notes || "No notes"}</p>
-      </div>
+        {/* Address Information */}
+        {lead.permanentAddress && (
+          <div className="detail-section">
+            <h3>Permanent Address</h3>
+            <div className="detail-item full-width">
+              <span>{lead.permanentAddress}</span>
+            </div>
+          </div>
+        )}
 
-      {/* Footer buttons */}
-      <div
-        style={{
-          marginTop: 20,
-          display: "flex",
-          justifyContent: "center",
-          gap: "16px",
-        }}
-      >
-        <button className="btn secondary" onClick={() => navigate("/leads")}>
-          Back
-        </button>
-        <button className="btn" onClick={convertLead}>
-          Convert Lead
-        </button>
+        {lead.currentAddress && (
+          <div className="detail-section">
+            <h3>Current Address</h3>
+            <div className="detail-item full-width">
+              <span>{lead.currentAddress}</span>
+            </div>
+          </div>
+        )}
+
+        {lead.siteAddress && (
+          <div className="detail-section">
+            <h3>Site Address</h3>
+            <div className="detail-item full-width">
+              <span>{lead.siteAddress}</span>
+            </div>
+          </div>
+        )}
+
+        {lead.officeAddress && (
+          <div className="detail-section">
+            <h3>Office Address</h3>
+            <div className="detail-item full-width">
+              <span>{lead.officeAddress}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        <div className="detail-section">
+          <h3>Notes</h3>
+          <div className="detail-item full-width">
+            <span>{lead.notes || "N/A"}</span>
+          </div>
+        </div>
+
+        {/* System Information */}
+        <div className="detail-section">
+          <h3>System Information</h3>
+          <div className="grid-2">
+            <div className="detail-item">
+              <label>Created:</label>
+              <span>{new Date(lead.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="detail-item">
+              <label>Last Updated:</label>
+              <span>{new Date(lead.updatedAt).toLocaleString()}</span>
+            </div>
+            {lead.assignedTo && (
+              <div className="detail-item">
+                <label>Assigned To:</label>
+                <span>{lead.assignedTo.name}</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

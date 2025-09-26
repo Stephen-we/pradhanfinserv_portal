@@ -1,3 +1,4 @@
+// server/src/models/ChannelPartner.js
 import mongoose from "mongoose";
 const ChannelPartnerSchema = new mongoose.Schema({
   partnerId: { type: String, unique: true },

@@ -1,4 +1,3 @@
-// server/src/models/Lead.js
 import mongoose from "mongoose";
 import Counter from "./Counter.js";
 
@@ -19,6 +18,12 @@ const LeadSchema = new mongoose.Schema(
     gdStatus: { type: String, enum: ["Pending", "In Progress", "Completed"], default: "Pending" },
     bank: String, // ✅ Added bank field
     branch: String,
+
+    // ✅ Add channelPartner reference
+    channelPartner: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "ChannelPartner" 
+    },
 
     requirementAmount: Number,
     sanctionedAmount: Number,
