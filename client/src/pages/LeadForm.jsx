@@ -13,10 +13,17 @@ const empty = {
   requirementAmount: "",
   sanctionedAmount: "",
   gdStatus: "Pending",
-  branch: "",
+  bank: "", // ✅ New field for bank selection
+  branch: "", // ✅ This will now be auto-populated based on bank
   status: "free_pool",
   notes: "",
-  // ❌ createdAt removed, backend handles it
+  // Address fields
+  permanentAddress: "",
+  currentAddress: "",
+  siteAddress: "",
+  officeAddress: "",
+  pan: "",
+  aadhar: "",
 };
 
 export default function LeadForm() {
@@ -25,18 +32,62 @@ export default function LeadForm() {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [duplicateError, setDuplicateError] = useState(null);
+  const [banks, setBanks] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
   const isEdit = Boolean(id);
+
+  // ✅ Fetch all distinct banks on component mount
+  useEffect(() => {
+    API.get("/branches/banks/distinct")
+      .then(({ data }) => setBanks(data))
+      .catch(() => console.error("Failed to load banks"));
+  }, []);
+
+  // ✅ Fetch branches when bank is selected
+  useEffect(() => {
+    if (!form.bank) {
+      setBranches([]);
+      setForm(prev => ({ ...prev, branch: "" }));
+      return;
+    }
+
+    setLoadingBranches(true);
+    API.get(`/branches/banks/${encodeURIComponent(form.bank)}/branches`)
+      .then(({ data }) => setBranches(data))
+      .catch(() => console.error("Failed to load branches"))
+      .finally(() => setLoadingBranches(false));
+  }, [form.bank]);
 
   useEffect(() => {
     if (!isEdit) return;
+    
     API.get(`/leads/${id}`)
       .then(({ data }) => {
-        setForm({
+        const leadData = {
           ...empty,
           ...data,
           requirementAmount: data.requirementAmount ?? "",
           sanctionedAmount: data.sanctionedAmount ?? "",
-        });
+          bank: data.bank || "",
+          branch: data.branch || "",
+          // Address fields
+          permanentAddress: data.permanentAddress || "",
+          currentAddress: data.currentAddress || "",
+          siteAddress: data.siteAddress || "",
+          officeAddress: data.officeAddress || "",
+          pan: data.pan || "",
+          aadhar: data.aadhar || "",
+        };
+        
+        setForm(leadData);
+
+        // ✅ If editing and bank exists, load its branches
+        if (data.bank) {
+          API.get(`/branches/banks/${encodeURIComponent(data.bank)}/branches`)
+            .then(({ data: branchesData }) => setBranches(branchesData))
+            .catch(() => console.error("Failed to load branches"));
+        }
       })
       .catch(() => alert("Unable to load lead"));
   }, [id, isEdit]);
@@ -45,27 +96,28 @@ export default function LeadForm() {
     e.preventDefault();
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        requirementAmount: form.requirementAmount === "" ? null : Number(form.requirementAmount),
+        sanctionedAmount: form.sanctionedAmount === "" ? null : Number(form.sanctionedAmount),
+        // Empty strings become null for consistency
+        permanentAddress: form.permanentAddress || null,
+        currentAddress: form.currentAddress || null,
+        siteAddress: form.siteAddress || null,
+        officeAddress: form.officeAddress || null,
+        pan: form.pan || null,
+        aadhar: form.aadhar || null,
+      };
+
       if (isEdit) {
-        await API.patch(`/leads/${id}`, {
-          ...form,
-          requirementAmount:
-            form.requirementAmount === "" ? null : Number(form.requirementAmount),
-          sanctionedAmount:
-            form.sanctionedAmount === "" ? null : Number(form.sanctionedAmount),
-        });
+        await API.patch(`/leads/${id}`, payload);
       } else {
-        await API.post("/leads", {
-          ...form,
-          requirementAmount:
-            form.requirementAmount === "" ? null : Number(form.requirementAmount),
-          sanctionedAmount:
-            form.sanctionedAmount === "" ? null : Number(form.sanctionedAmount),
-        });
+        await API.post("/leads", payload);
       }
       navigate("/leads");
     } catch (err) {
       if (err.response?.status === 400) {
-        setDuplicateError(err.response.data); // { message, id, leadId, status }
+        setDuplicateError(err.response.data);
       } else {
         alert(err.response?.data?.message || "Save failed");
       }
@@ -74,8 +126,12 @@ export default function LeadForm() {
     }
   };
 
+  const handleInputChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
   return (
-    <div className="card" style={{ maxWidth: 720 }}>
+    <div className="card" style={{ maxWidth: 800 }}>
       <h2 style={{ marginTop: 0 }}>{isEdit ? "Edit Lead" : "Add Lead"}</h2>
       <form
         onSubmit={submit}
@@ -85,18 +141,18 @@ export default function LeadForm() {
         {/* Customer Name */}
         <input
           className="input"
-          placeholder="Customer Name"
+          placeholder="Customer Name *"
           value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          onChange={(e) => handleInputChange('name', e.target.value)}
           required
         />
 
-        {/* Mobile (10 digits only) */}
+        {/* Mobile */}
         <input
           className="input"
-          placeholder="Mobile"
+          placeholder="Mobile *"
           value={form.mobile}
-          onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+          onChange={(e) => handleInputChange('mobile', e.target.value)}
           required
           pattern="[0-9]{10}"
           maxLength={10}
@@ -109,30 +165,63 @@ export default function LeadForm() {
           placeholder="Email"
           type="email"
           value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          onChange={(e) => handleInputChange('email', e.target.value)}
         />
 
-        {/* Source (dropdown: Business/Non-Business) */}
+        {/* Source */}
         <select
           className="input"
           value={form.source}
-          onChange={(e) => setForm({ ...form, source: e.target.value })}
+          onChange={(e) => handleInputChange('source', e.target.value)}
           required
         >
-          <option value="">-- Select Source --</option>
+          <option value="">-- Select Source * --</option>
           <option value="Business">Business</option>
           <option value="Non-Business">Non-Business</option>
+        </select>
+
+        {/* ✅ Bank Selection */}
+        <select
+          className="input"
+          value={form.bank}
+          onChange={(e) => handleInputChange('bank', e.target.value)}
+        >
+          <option value="">-- Select Bank --</option>
+          {banks.map((bank) => (
+            <option key={bank} value={bank}>
+              {bank}
+            </option>
+          ))}
+        </select>
+
+        {/* ✅ Branch Selection (depends on bank) */}
+        <select
+          className="input"
+          value={form.branch}
+          onChange={(e) => handleInputChange('branch', e.target.value)}
+          disabled={!form.bank || loadingBranches}
+        >
+          <option value="">-- Select Branch --</option>
+          {loadingBranches ? (
+            <option>Loading branches...</option>
+          ) : (
+            branches.map((branch) => (
+              <option key={branch} value={branch}>
+                {branch}
+              </option>
+            ))
+          )}
         </select>
 
         {/* Lead Type */}
         <select
           className="input"
           value={form.leadType}
-          onChange={(e) => setForm({ ...form, leadType: e.target.value })}
+          onChange={(e) => handleInputChange('leadType', e.target.value)}
         >
-          <option>Loan</option>
-          <option>Insurance</option>
-          <option>Real Estate</option>
+          <option value="Loan">Loan</option>
+          <option value="Insurance">Insurance</option>
+          <option value="Real Estate">Real Estate</option>
         </select>
 
         {/* Sub Type */}
@@ -140,7 +229,7 @@ export default function LeadForm() {
           className="input"
           placeholder="Sub Type"
           value={form.subType}
-          onChange={(e) => setForm({ ...form, subType: e.target.value })}
+          onChange={(e) => handleInputChange('subType', e.target.value)}
         />
 
         {/* Requirement Amount */}
@@ -149,9 +238,7 @@ export default function LeadForm() {
           placeholder="Requirement Amount"
           type="number"
           value={form.requirementAmount}
-          onChange={(e) =>
-            setForm({ ...form, requirementAmount: e.target.value })
-          }
+          onChange={(e) => handleInputChange('requirementAmount', e.target.value)}
         />
 
         {/* Sanctioned Amount */}
@@ -160,41 +247,87 @@ export default function LeadForm() {
           placeholder="Sanctioned Amount"
           type="number"
           value={form.sanctionedAmount}
-          onChange={(e) =>
-            setForm({ ...form, sanctionedAmount: e.target.value })
-          }
+          onChange={(e) => handleInputChange('sanctionedAmount', e.target.value)}
         />
 
         {/* GD Status */}
         <select
           className="input"
           value={form.gdStatus}
-          onChange={(e) => setForm({ ...form, gdStatus: e.target.value })}
+          onChange={(e) => handleInputChange('gdStatus', e.target.value)}
         >
-          <option>Pending</option>
-          <option>In Progress</option>
-          <option>Completed</option>
+          <option value="Pending">Pending</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
         </select>
-
-        {/* Branch */}
-        <input
-          className="input"
-          placeholder="Branch"
-          value={form.branch}
-          onChange={(e) => setForm({ ...form, branch: e.target.value })}
-        />
 
         {/* Status */}
         <select
           className="input"
           value={form.status}
-          onChange={(e) => setForm({ ...form, status: e.target.value })}
+          onChange={(e) => handleInputChange('status', e.target.value)}
         >
-          <option value="free_pool">free_pool</option>
-          <option value="assigned">assigned</option>
-          <option value="archived">archived</option>
-          <option value="deleted">deleted</option>
+          <option value="free_pool">Free Pool</option>
+          <option value="assigned">Assigned</option>
+          <option value="archived">Archived</option>
+          <option value="deleted">Deleted</option>
         </select>
+
+        {/* PAN */}
+        <input
+          className="input"
+          placeholder="PAN Number"
+          value={form.pan}
+          onChange={(e) => handleInputChange('pan', e.target.value)}
+          style={{ textTransform: 'uppercase' }}
+          maxLength={10}
+        />
+
+        {/* Aadhar */}
+        <input
+          className="input"
+          placeholder="Aadhar Number"
+          type="number"
+          value={form.aadhar}
+          onChange={(e) => handleInputChange('aadhar', e.target.value)}
+          maxLength={12}
+        />
+
+        {/* Permanent Address */}
+        <textarea
+          className="input"
+          placeholder="Permanent Address"
+          style={{ gridColumn: "1 / -1", minHeight: 60 }}
+          value={form.permanentAddress}
+          onChange={(e) => handleInputChange('permanentAddress', e.target.value)}
+        />
+
+        {/* Current Address */}
+        <textarea
+          className="input"
+          placeholder="Current Address"
+          style={{ gridColumn: "1 / -1", minHeight: 60 }}
+          value={form.currentAddress}
+          onChange={(e) => handleInputChange('currentAddress', e.target.value)}
+        />
+
+        {/* Site Address */}
+        <textarea
+          className="input"
+          placeholder="Site Address"
+          style={{ gridColumn: "1 / -1", minHeight: 60 }}
+          value={form.siteAddress}
+          onChange={(e) => handleInputChange('siteAddress', e.target.value)}
+        />
+
+        {/* Office Address */}
+        <textarea
+          className="input"
+          placeholder="Office Address"
+          style={{ gridColumn: "1 / -1", minHeight: 60 }}
+          value={form.officeAddress}
+          onChange={(e) => handleInputChange('officeAddress', e.target.value)}
+        />
 
         {/* Notes */}
         <textarea
@@ -202,7 +335,7 @@ export default function LeadForm() {
           placeholder="Notes"
           style={{ gridColumn: "1 / -1", minHeight: 80 }}
           value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          onChange={(e) => handleInputChange('notes', e.target.value)}
         />
 
         {/* Buttons */}
@@ -212,6 +345,9 @@ export default function LeadForm() {
             display: "flex",
             gap: 8,
             justifyContent: "flex-end",
+            borderTop: "1px solid #eee",
+            paddingTop: 16,
+            marginTop: 8,
           }}
         >
           <button
@@ -242,9 +378,7 @@ export default function LeadForm() {
               </button>
               <button
                 className="btn"
-                onClick={() =>
-                  navigate(`/leads/${duplicateError.id}/view`)
-                }
+                onClick={() => navigate(`/leads/${duplicateError.id}/view`)}
               >
                 View Existing ({duplicateError.leadId})
               </button>

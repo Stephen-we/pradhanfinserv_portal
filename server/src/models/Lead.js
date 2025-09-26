@@ -1,4 +1,4 @@
-// server/src/models/Leads
+// server/src/models/Lead.js
 import mongoose from "mongoose";
 import Counter from "./Counter.js";
 
@@ -17,6 +17,7 @@ const LeadSchema = new mongoose.Schema(
     leadType: { type: String, enum: ["Loan", "Insurance", "Real Estate"], default: "Loan" },
     subType: String,
     gdStatus: { type: String, enum: ["Pending", "In Progress", "Completed"], default: "Pending" },
+    bank: String, // ✅ Added bank field
     branch: String,
 
     requirementAmount: Number,
@@ -25,7 +26,7 @@ const LeadSchema = new mongoose.Schema(
     status: { type: String, enum: ["free_pool", "assigned", "archived", "deleted"], default: "free_pool" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-    // ✅ Added missing fields for conversion
+    // Address fields for conversion
     permanentAddress: String,
     currentAddress: String,
     siteAddress: String,
