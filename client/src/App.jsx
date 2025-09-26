@@ -41,7 +41,15 @@ export default function App() {
           </Protected>
         }
       />
-      <Route path="/cases/:id/tasks" element={<CaseTasks />} />
+      
+      <Route 
+        path="/cases/:id/tasks" 
+        element={
+          <Protected>
+            <MainLayout><CaseTasks /></MainLayout>
+          </Protected>
+        } 
+      />
 
       <Route
         path="/users"
@@ -52,7 +60,7 @@ export default function App() {
         }
       />
 
-      {/* Leads */}
+      {/* Leads Routes */}
       <Route
         path="/leads"
         element={

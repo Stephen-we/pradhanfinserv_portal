@@ -1,0 +1,51 @@
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.content {
+  flex: 1;
+  margin-left: 240px; /* Sidebar width */
+  transition: margin-left 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+/* When sidebar is collapsed */
+.sidebar.collapsed ~ .content {
+  margin-left: 70px;
+}
+
+/* Header styles */
+.main-header {
+  background: white;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between; /* Space between company name and user profile */
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.company-name h2 {
+  color: #2f3c7e;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+}
+
+/* Main content area */
+main {
+  flex: 1;
+  padding: 2rem;
+  background: #f8f9fa;
+  overflow-y: auto;
+}

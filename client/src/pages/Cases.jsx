@@ -124,13 +124,24 @@ export default function Cases() {
       </header>
       <DataTable
         columns={[
+          // 🔹 Added Sr. No column
+          {
+            header: "Sr. No",
+            accessor: (row, index, exportMode) => {
+              if (exportMode) return index + 1;
+              return index + 1;
+            },
+          },
           {
             header: "Case ID",
-            accessor: (row) => (
-              <Link to={`/cases/${row._id}/view`} style={{ color: "blue" }}>
-                {row.caseId || "-"}
-              </Link>
-            ),
+            accessor: (row, index, exportMode) => {
+              if (exportMode) return row.caseId || "-";
+              return (
+                <Link to={`/cases/${row._id}/view`} style={{ color: "blue" }}>
+                  {row.caseId || "-"}
+                </Link>
+              );
+            },
           },
           { header: "Customer Name", accessor: "customerName" },
           { header: "Mobile", accessor: "mobile" },
@@ -139,7 +150,7 @@ export default function Cases() {
           // Assigned column
           {
             header: "Assigned",
-            accessor: (row, _i, exportMode) => {
+            accessor: (row, index, exportMode) => {
               if (exportMode) return getAssignedName(row);
               const current = getAssignedId(row);
               return (
@@ -163,7 +174,7 @@ export default function Cases() {
           // Task column
           {
             header: "Task",
-            accessor: (row, _i, exportMode) => {
+            accessor: (row, index, exportMode) => {
               if (exportMode) return row.task || "";
               const handleTaskChange = async (value) => {
                 await API.put(`/cases/${row._id}`, { ...row, task: value });

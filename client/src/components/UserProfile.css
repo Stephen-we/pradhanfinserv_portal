@@ -1,0 +1,65 @@
+.user-profile {
+  position: relative;
+  display: inline-block;
+}
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.profile-trigger:hover {
+  background: #e0e0e0;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #2f3c7e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.user-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  color: #666;
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-top: 5px;
+  z-index: 1000;
+}
+
+.dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.3s;
+  white-space: nowrap;
+}
+
+.dropdown-item:hover {
+  background: #f5f5f5;
+}
