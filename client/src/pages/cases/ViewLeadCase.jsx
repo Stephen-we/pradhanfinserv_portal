@@ -4,7 +4,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import API from "../../services/api";
 import { FiEdit, FiUser, FiBriefcase, FiHome, FiFileText, FiUsers, FiMapPin, FiPaperclip } from "react-icons/fi";
 import "../../styles/cases.css";
-import "../../styles/viewCase.css";
 
 export default function ViewLeadCase() {
   const { id } = useParams();
@@ -184,7 +183,7 @@ export default function ViewLeadCase() {
             </div>
             <div className="info-row">
               <label>Mobile</label>
-              <span className="contact-info">{show(caseData.primaryMobile)}</span>
+              <span className="contact-info">{show(caseData.mobile)}</span>
             </div>
             <div className="info-row">
               <label>Email</label>
