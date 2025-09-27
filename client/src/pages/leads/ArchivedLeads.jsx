@@ -43,7 +43,7 @@ function ArchivedLeads() {
           { header: "Lead ID", accessor: (row) => (
               <a
                 href="#"
-                onClick={(e) => { e.preventDefault(); navigate(`/leads/${row._id}/view`); }}
+                onClick={(e) => { e.preventDefault(); navigate(`/leads/view/${row._id}`); }}
                 style={{ color: "#2563eb", textDecoration: "underline", cursor: "pointer" }}
               >
                 {row.leadId}

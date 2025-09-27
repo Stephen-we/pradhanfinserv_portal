@@ -1,3 +1,4 @@
+//client/src/pages/cases/LeadFormCase.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import API from "../../services/api";
@@ -10,10 +11,6 @@ export default function LeadFormCase() {
   const [form, setForm] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCoApplicant, setShowCoApplicant] = useState(false);
-
-  // 🔹 Bank/Branch sources
-  const [bankMap, setBankMap] = useState({});   // { [bankName]: [branchName1, branchName2, ...] }
-  const [bankList, setBankList] = useState([]); // ["HDFC", "ICICI", ...]
 
   // -------- Load Case --------
   useEffect(() => {
@@ -30,68 +27,12 @@ export default function LeadFormCase() {
       .catch(() => alert("Unable to load case"));
   }, [id]);
 
-  // -------- Load Banks/Branches (from existing branches API) --------
-  useEffect(() => {
-    API.get("/branches")
-      .then(({ data }) => {
-        const map = {};
-        (data || []).forEach((b) => {
-          const bank = b.bankName || "";
-          const branch = b.branchName || "";
-          if (!bank) return;
-          if (!map[bank]) map[bank] = [];
-          if (branch && !map[bank].includes(branch)) map[bank].push(branch);
-        });
-
-        const banks = Object.keys(map).sort((a, b) => a.localeCompare(b));
-        setBankMap(map);
-        setBankList(banks);
-      })
-      .catch(() => {
-        // Silent fail: keep manual entry fallback if needed (but we won't show manual)
-        console.warn("Could not load /branches for bank/branch options");
-      });
-  }, []);
-
-  // -------- Sync default bank/branch only if case didn't have them --------
-  useEffect(() => {
-    if (!bankList.length) return;
-
-    // If form already has bank, ensure branch aligns with it
-    if (form.bank) {
-      const firstBranch = (bankMap[form.bank] && bankMap[form.bank][0]) || "";
-      if (firstBranch && form.branch !== firstBranch) {
-        setForm((prev) => ({ ...prev, branch: firstBranch }));
-      }
-      return;
-    }
-
-    // Otherwise, set a default bank + first branch
-    const firstBank = bankList[0];
-    const firstBranch = (bankMap[firstBank] && bankMap[firstBank][0]) || "";
-    setForm((prev) => ({
-      ...prev,
-      bank: firstBank || prev.bank || "",
-      branch: firstBranch || prev.branch || "",
-    }));
-  }, [bankList, bankMap, form.bank]); // eslint-disable-line
-
   // -------- Handlers --------
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     setForm((prev) => ({
       ...prev,
       [name]: files ? files[0] : value,
-    }));
-  };
-
-  const handleBankChange = (e) => {
-    const bank = e.target.value;
-    const firstBranch = (bankMap[bank] && bankMap[bank][0]) || "";
-    setForm((prev) => ({
-      ...prev,
-      bank,
-      branch: firstBranch,
     }));
   };
 
@@ -107,7 +48,7 @@ export default function LeadFormCase() {
     setForm((prev) => ({ ...prev, aadharNumber: v }));
   };
 
-  // ✅ Progress calculation (unchanged)
+  // ✅ Progress calculation (updated to remove bank/branch from required fields)
   const progress = useMemo(() => {
     const requiredFields = [
       "leadId",
@@ -116,8 +57,6 @@ export default function LeadFormCase() {
       "email",
       "loanType",
       "amount",
-      "bank",
-      "branch",
       "permanentAddress",
     ];
     const filled = requiredFields.filter(
@@ -195,39 +134,7 @@ export default function LeadFormCase() {
           />
         </div>
 
-        {/* 🔹 Bank & Branch (bank select, branch auto) */}
-        <div className="grid-2">
-          <div className="section">
-            <label>Bank</label>
-            <select
-              name="bank"
-              value={form.bank || ""}
-              onChange={handleBankChange}
-              className="select"
-            >
-              {bankList.length === 0 && (
-                <option value="">Loading banks...</option>
-              )}
-              {bankList.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="section">
-            <label>Branch</label>
-            <input
-              type="text"
-              name="branch"
-              value={form.branch || ""}
-              readOnly
-              className="readonly"
-              title="Auto-selected based on bank"
-            />
-          </div>
-        </div>
+        {/* 🔹 Bank & Branch removed from here */}
 
         {/* Applicant Details */}
         <h3 className="form-section-title">
