@@ -1,3 +1,4 @@
+// client/src/pages/leads/ArchivedLeads.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../services/api";

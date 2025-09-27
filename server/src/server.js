@@ -1,4 +1,3 @@
-// server/src/serve.js
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -62,12 +61,13 @@ app.use("/api/users", userRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/cases", caseRoutes);
-app.use("/api/partners", partnerRoutes);
+
+// ✅ Fix: use /channel-partners to match frontend
+app.use("/api/channel-partners", partnerRoutes);
+
 app.use("/api/branches", branchRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/customer-docs", customerDocs);
-
-// ✅ mount tasks AFTER middleware (CORS/JSON) like the others
 app.use("/api/tasks", taskRoutes);
 
 // ---- Static Uploads ----
@@ -81,4 +81,6 @@ app.use((err, req, res, next) => {
 
 // ---- Start ----
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
+ app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
+
+

@@ -15,10 +15,9 @@ const empty = {
   gdStatus: "Pending",
   bank: "",
   branch: "",
-  channelPartner: "", // ✅ New field for channel partner
+  channelPartner: "",
   status: "free_pool",
   notes: "",
-  // Address fields
   permanentAddress: "",
   currentAddress: "",
   siteAddress: "",
@@ -36,28 +35,56 @@ export default function LeadForm() {
   const [banks, setBanks] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
-  const [channelPartners, setChannelPartners] = useState([]); // ✅ New state for channel partners
+  const [channelPartners, setChannelPartners] = useState([]);
+  const [partnersError, setPartnersError] = useState(null);
   const isEdit = Boolean(id);
 
-  // ✅ Fetch all distinct banks on component mount
+  // ✅ Fetch all distinct banks
   useEffect(() => {
     API.get("/branches/banks/distinct")
       .then(({ data }) => setBanks(data))
       .catch(() => console.error("Failed to load banks"));
   }, []);
 
-  // ✅ Fetch all channel partners on component mount
+  // ✅ Fetch channel partners (normalize response for items/docs/array)
   useEffect(() => {
-    API.get("/channel-partners")
-      .then(({ data }) => setChannelPartners(data))
-      .catch(() => console.error("Failed to load channel partners"));
+    const fetchChannelPartners = async () => {
+      try {
+        setPartnersError(null);
+        const { data } = await API.get("/channel-partners");
+
+        console.log("🔎 Channel Partners API response:", data);
+
+        let partners = [];
+        if (Array.isArray(data)) {
+          partners = data;
+        } else if (data && Array.isArray(data.docs)) {
+          partners = data.docs;
+        } else if (data && Array.isArray(data.items)) {
+          partners = data.items; // ✅ matches your backend
+        }
+
+        if (partners.length > 0) {
+          setChannelPartners(partners);
+        } else {
+          setChannelPartners([]);
+          setPartnersError("⚠️ No channel partners found");
+        }
+      } catch (error) {
+        console.error("Failed to load channel partners:", error);
+        setChannelPartners([]);
+        setPartnersError("Failed to load channel partners. The feature may not be available.");
+      }
+    };
+
+    fetchChannelPartners();
   }, []);
 
-  // ✅ Fetch branches when bank is selected
+  // ✅ Fetch branches when bank changes
   useEffect(() => {
     if (!form.bank) {
       setBranches([]);
-      setForm(prev => ({ ...prev, branch: "" }));
+      setForm((prev) => ({ ...prev, branch: "" }));
       return;
     }
 
@@ -68,9 +95,10 @@ export default function LeadForm() {
       .finally(() => setLoadingBranches(false));
   }, [form.bank]);
 
+  // ✅ Load lead if editing
   useEffect(() => {
     if (!isEdit) return;
-    
+
     API.get(`/leads/${id}`)
       .then(({ data }) => {
         const leadData = {
@@ -80,8 +108,7 @@ export default function LeadForm() {
           sanctionedAmount: data.sanctionedAmount ?? "",
           bank: data.bank || "",
           branch: data.branch || "",
-          channelPartner: data.channelPartner || "", // ✅ Include channel partner
-          // Address fields
+          channelPartner: data.channelPartner || "",
           permanentAddress: data.permanentAddress || "",
           currentAddress: data.currentAddress || "",
           siteAddress: data.siteAddress || "",
@@ -89,10 +116,9 @@ export default function LeadForm() {
           pan: data.pan || "",
           aadhar: data.aadhar || "",
         };
-        
+
         setForm(leadData);
 
-        // ✅ If editing and bank exists, load its branches
         if (data.bank) {
           API.get(`/branches/banks/${encodeURIComponent(data.bank)}/branches`)
             .then(({ data: branchesData }) => setBranches(branchesData))
@@ -102,22 +128,24 @@ export default function LeadForm() {
       .catch(() => alert("Unable to load lead"));
   }, [id, isEdit]);
 
+  // ✅ Submit form
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
       const payload = {
         ...form,
-        requirementAmount: form.requirementAmount === "" ? null : Number(form.requirementAmount),
-        sanctionedAmount: form.sanctionedAmount === "" ? null : Number(form.sanctionedAmount),
-        // Empty strings become null for consistency
+        requirementAmount:
+          form.requirementAmount === "" ? null : Number(form.requirementAmount),
+        sanctionedAmount:
+          form.sanctionedAmount === "" ? null : Number(form.sanctionedAmount),
         permanentAddress: form.permanentAddress || null,
         currentAddress: form.currentAddress || null,
         siteAddress: form.siteAddress || null,
         officeAddress: form.officeAddress || null,
         pan: form.pan || null,
         aadhar: form.aadhar || null,
-        channelPartner: form.channelPartner || null, // ✅ Include channel partner in payload
+        channelPartner: form.channelPartner || null,
       };
 
       if (isEdit) {
@@ -138,12 +166,30 @@ export default function LeadForm() {
   };
 
   const handleInputChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
     <div className="card" style={{ maxWidth: 800 }}>
       <h2 style={{ marginTop: 0 }}>{isEdit ? "Edit Lead" : "Add Lead"}</h2>
+
+      {/* ✅ Channel Partners Error Message */}
+      {partnersError && (
+        <div
+          style={{
+            background: "#fff3cd",
+            border: "1px solid #ffeaa7",
+            color: "#856404",
+            padding: "10px",
+            borderRadius: "4px",
+            marginBottom: "15px",
+            fontSize: "14px",
+          }}
+        >
+          {partnersError}
+        </div>
+      )}
+
       <form
         onSubmit={submit}
         className="grid"
@@ -154,7 +200,7 @@ export default function LeadForm() {
           className="input"
           placeholder="Customer Name *"
           value={form.name}
-          onChange={(e) => handleInputChange('name', e.target.value)}
+          onChange={(e) => handleInputChange("name", e.target.value)}
           required
         />
 
@@ -163,7 +209,7 @@ export default function LeadForm() {
           className="input"
           placeholder="Mobile *"
           value={form.mobile}
-          onChange={(e) => handleInputChange('mobile', e.target.value)}
+          onChange={(e) => handleInputChange("mobile", e.target.value)}
           required
           pattern="[0-9]{10}"
           maxLength={10}
@@ -176,14 +222,14 @@ export default function LeadForm() {
           placeholder="Email"
           type="email"
           value={form.email}
-          onChange={(e) => handleInputChange('email', e.target.value)}
+          onChange={(e) => handleInputChange("email", e.target.value)}
         />
 
         {/* Source */}
         <select
           className="input"
           value={form.source}
-          onChange={(e) => handleInputChange('source', e.target.value)}
+          onChange={(e) => handleInputChange("source", e.target.value)}
           required
         >
           <option value="">-- Select Source * --</option>
@@ -191,25 +237,31 @@ export default function LeadForm() {
           <option value="Non-Business">Non-Business</option>
         </select>
 
-        {/* ✅ Channel Partner Selection */}
+        {/* ✅ Channel Partner Dropdown */}
         <select
           className="input"
           value={form.channelPartner}
-          onChange={(e) => handleInputChange('channelPartner', e.target.value)}
+          onChange={(e) => handleInputChange("channelPartner", e.target.value)}
+          style={partnersError ? { borderColor: "#ffc107" } : {}}
         >
           <option value="">-- Select Channel Partner --</option>
-          {channelPartners.map((partner) => (
-            <option key={partner._id} value={partner._id}>
-              {partner.name}
-            </option>
-          ))}
+          {channelPartners.length === 0 && !partnersError ? (
+            <option disabled>Loading channel partners...</option>
+          ) : (
+            channelPartners.map((partner) => (
+              <option key={partner._id} value={partner._id}>
+                {partner.partnerId} - {partner.name}
+                </option>
+
+            ))
+          )}
         </select>
 
         {/* ✅ Bank Selection */}
         <select
           className="input"
           value={form.bank}
-          onChange={(e) => handleInputChange('bank', e.target.value)}
+          onChange={(e) => handleInputChange("bank", e.target.value)}
         >
           <option value="">-- Select Bank --</option>
           {banks.map((bank) => (
@@ -219,11 +271,11 @@ export default function LeadForm() {
           ))}
         </select>
 
-        {/* ✅ Branch Selection (depends on bank) */}
+        {/* ✅ Branch Selection */}
         <select
           className="input"
           value={form.branch}
-          onChange={(e) => handleInputChange('branch', e.target.value)}
+          onChange={(e) => handleInputChange("branch", e.target.value)}
           disabled={!form.bank || loadingBranches}
         >
           <option value="">-- Select Branch --</option>
@@ -242,7 +294,7 @@ export default function LeadForm() {
         <select
           className="input"
           value={form.leadType}
-          onChange={(e) => handleInputChange('leadType', e.target.value)}
+          onChange={(e) => handleInputChange("leadType", e.target.value)}
         >
           <option value="Loan">Loan</option>
           <option value="Insurance">Insurance</option>
@@ -254,7 +306,7 @@ export default function LeadForm() {
           className="input"
           placeholder="Sub Type"
           value={form.subType}
-          onChange={(e) => handleInputChange('subType', e.target.value)}
+          onChange={(e) => handleInputChange("subType", e.target.value)}
         />
 
         {/* Requirement Amount */}
@@ -263,7 +315,7 @@ export default function LeadForm() {
           placeholder="Requirement Amount"
           type="number"
           value={form.requirementAmount}
-          onChange={(e) => handleInputChange('requirementAmount', e.target.value)}
+          onChange={(e) => handleInputChange("requirementAmount", e.target.value)}
         />
 
         {/* Sanctioned Amount */}
@@ -272,14 +324,14 @@ export default function LeadForm() {
           placeholder="Sanctioned Amount"
           type="number"
           value={form.sanctionedAmount}
-          onChange={(e) => handleInputChange('sanctionedAmount', e.target.value)}
+          onChange={(e) => handleInputChange("sanctionedAmount", e.target.value)}
         />
 
         {/* GD Status */}
         <select
           className="input"
           value={form.gdStatus}
-          onChange={(e) => handleInputChange('gdStatus', e.target.value)}
+          onChange={(e) => handleInputChange("gdStatus", e.target.value)}
         >
           <option value="Pending">Pending</option>
           <option value="In Progress">In Progress</option>
@@ -290,7 +342,7 @@ export default function LeadForm() {
         <select
           className="input"
           value={form.status}
-          onChange={(e) => handleInputChange('status', e.target.value)}
+          onChange={(e) => handleInputChange("status", e.target.value)}
         >
           <option value="free_pool">Free Pool</option>
           <option value="assigned">Assigned</option>
@@ -303,8 +355,8 @@ export default function LeadForm() {
           className="input"
           placeholder="PAN Number"
           value={form.pan}
-          onChange={(e) => handleInputChange('pan', e.target.value)}
-          style={{ textTransform: 'uppercase' }}
+          onChange={(e) => handleInputChange("pan", e.target.value)}
+          style={{ textTransform: "uppercase" }}
           maxLength={10}
         />
 
@@ -314,7 +366,7 @@ export default function LeadForm() {
           placeholder="Aadhar Number"
           type="number"
           value={form.aadhar}
-          onChange={(e) => handleInputChange('aadhar', e.target.value)}
+          onChange={(e) => handleInputChange("aadhar", e.target.value)}
           maxLength={12}
         />
 
@@ -324,7 +376,7 @@ export default function LeadForm() {
           placeholder="Permanent Address"
           style={{ gridColumn: "1 / -1", minHeight: 60 }}
           value={form.permanentAddress}
-          onChange={(e) => handleInputChange('permanentAddress', e.target.value)}
+          onChange={(e) => handleInputChange("permanentAddress", e.target.value)}
         />
 
         {/* Current Address */}
@@ -333,7 +385,7 @@ export default function LeadForm() {
           placeholder="Current Address"
           style={{ gridColumn: "1 / -1", minHeight: 60 }}
           value={form.currentAddress}
-          onChange={(e) => handleInputChange('currentAddress', e.target.value)}
+          onChange={(e) => handleInputChange("currentAddress", e.target.value)}
         />
 
         {/* Site Address */}
@@ -342,7 +394,7 @@ export default function LeadForm() {
           placeholder="Site Address"
           style={{ gridColumn: "1 / -1", minHeight: 60 }}
           value={form.siteAddress}
-          onChange={(e) => handleInputChange('siteAddress', e.target.value)}
+          onChange={(e) => handleInputChange("siteAddress", e.target.value)}
         />
 
         {/* Office Address */}
@@ -351,7 +403,7 @@ export default function LeadForm() {
           placeholder="Office Address"
           style={{ gridColumn: "1 / -1", minHeight: 60 }}
           value={form.officeAddress}
-          onChange={(e) => handleInputChange('officeAddress', e.target.value)}
+          onChange={(e) => handleInputChange("officeAddress", e.target.value)}
         />
 
         {/* Notes */}
@@ -360,7 +412,7 @@ export default function LeadForm() {
           placeholder="Notes"
           style={{ gridColumn: "1 / -1", minHeight: 80 }}
           value={form.notes}
-          onChange={(e) => handleInputChange('notes', e.target.value)}
+          onChange={(e) => handleInputChange("notes", e.target.value)}
         />
 
         {/* Buttons */}

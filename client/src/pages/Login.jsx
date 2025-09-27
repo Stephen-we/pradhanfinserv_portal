@@ -38,6 +38,8 @@ export default function Login() {
     e.preventDefault();
     try {
       const { data } = await API.post("/auth/login", { email, password });
+        // 👇 Add this line
+      console.log("🔑 Login API response:", data);
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       navigate("/dashboard");   // ✅ cleaner redirect
