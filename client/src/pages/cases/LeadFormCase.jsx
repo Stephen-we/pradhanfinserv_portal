@@ -8,6 +8,9 @@ export default function LeadFormCase() {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  // 🔹 Detect public mode based on URL path: /cases/:id/public-form
+  const isPublic = typeof window !== "undefined" && window.location.pathname.includes("public-form");
+
   const [form, setForm] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCoApplicant, setShowCoApplicant] = useState(false);
@@ -48,8 +51,14 @@ export default function LeadFormCase() {
         if (prev >= 100) {
           clearInterval(interval);
           setTimeout(() => {
-            setShowSuccessPopup(false);
-            navigate(`/cases/${id}/view`);
+            // 🔹 In public mode: do NOT redirect to protected /view (would require login)
+            if (!isPublic) {
+              setShowSuccessPopup(false);
+              navigate(`/cases/${id}/view`);
+            } else {
+              // In public mode, just close the popup after completion
+              setShowSuccessPopup(false);
+            }
           }, 1000);
           return 100;
         }
@@ -60,7 +69,9 @@ export default function LeadFormCase() {
 
   // -------- Load Case --------
   useEffect(() => {
-    API.get(`/cases/${id}`)
+    // 🔹 Use public endpoint in public mode
+    const url = isPublic ? `/cases/${id}/public` : `/cases/${id}`;
+    API.get(url)
       .then(({ data }) => {
         setForm({
           ...data,
@@ -80,7 +91,7 @@ export default function LeadFormCase() {
         }
       })
       .catch(() => alert("Unable to load case"));
-  }, [id]);
+  }, [id, isPublic]);
 
   // Convert old kycDocs structure to new documentSections structure
   const convertOldToNewStructure = (kycDocs) => {
@@ -261,7 +272,7 @@ export default function LeadFormCase() {
       let totalFiles = 0;
       documentSections.forEach((section, sectionIndex) => {
         section.documents.forEach((doc, docIndex) => {
-          doc.files.forEach((fileObj, fileIndex) => {
+          doc.files.forEach((fileObj) => {
             // Only append new files (not already uploaded ones)
             if (fileObj.file && !fileObj.isUploaded) {
               fd.append('documents', fileObj.file);
@@ -280,7 +291,9 @@ export default function LeadFormCase() {
 
       console.log(`📦 Submitting form with ${totalFiles} new files and ${documentSections.length} document sections`);
 
-      const response = await API.put(`/cases/${id}`, fd, {
+      // 🔹 Use public endpoint in public mode
+      const url = isPublic ? `/cases/${id}/public` : `/cases/${id}`;
+      const response = await API.put(url, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -327,7 +340,9 @@ export default function LeadFormCase() {
                 />
               </div>
               <span className="success-progress-text">
-                {successProgress === 100 ? 'Complete! Redirecting...' : `Processing... ${successProgress}%`}
+                {successProgress === 100 
+                  ? (isPublic ? 'Complete!' : 'Complete! Redirecting...') 
+                  : `Processing... ${successProgress}%`}
               </span>
             </div>
             

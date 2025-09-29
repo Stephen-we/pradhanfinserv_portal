@@ -569,7 +569,19 @@ const handleDownload = async () => {
         <button className="btn edit-main" onClick={goEdit}>
           Edit Case Details
         </button>
+        <button
+         className="btn secondary"
+          onClick={() => {
+            const publicUrl = `${window.location.protocol}//${window.location.host}/cases/${caseData._id}/public-form`;
+            navigator.clipboard.writeText(publicUrl);
+            alert("Public form link copied:\n" + publicUrl);
+          }}
+        >
+          Copy Public Form Link
+        </button>
+
       </div>
     </div>
+    
   );
 }

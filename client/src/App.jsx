@@ -1,4 +1,4 @@
-//client/src/App.jsx
+// client/src/App.jsx
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 
@@ -32,6 +32,9 @@ export default function App() {
       {/* Public Routes */}
       <Route path="/login" element={<AuthLayout><Login /></AuthLayout>} />
       <Route path="/signup" element={<AuthLayout><Signup /></AuthLayout>} />
+
+      {/* 🔹 Public Shareable Form Route (NO Protected, NO MainLayout) */}
+      <Route path="/cases/:id/public-form" element={<LeadFormCase />} />
 
       {/* Protected Routes with Main Layout */}
       <Route
