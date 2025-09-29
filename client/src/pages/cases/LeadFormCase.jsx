@@ -11,6 +11,8 @@ export default function LeadFormCase() {
   const [form, setForm] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCoApplicant, setShowCoApplicant] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successProgress, setSuccessProgress] = useState(0);
   
   // ✅ Document Management State
   const [documentSections, setDocumentSections] = useState([
@@ -34,6 +36,27 @@ export default function LeadFormCase() {
       ]
     }
   ]);
+
+  // -------- Enhanced Success Popup --------
+  const showEnhancedSuccess = () => {
+    setShowSuccessPopup(true);
+    setSuccessProgress(0);
+    
+    // Animate progress bar
+    const interval = setInterval(() => {
+      setSuccessProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setShowSuccessPopup(false);
+            navigate(`/cases/${id}/view`);
+          }, 1000);
+          return 100;
+        }
+        return prev + 20;
+      });
+    }, 100);
+  };
 
   // -------- Load Case --------
   useEffect(() => {
@@ -61,49 +84,14 @@ export default function LeadFormCase() {
 
   // Convert old kycDocs structure to new documentSections structure
   const convertOldToNewStructure = (kycDocs) => {
-    const kycDocumentNames = [
-      "Photo 4 each (A & C)",
-      "PAN Self attested - A & C", 
-      "Aadhar - self attested - A & C",
-      "Address Proof (Resident & Shop/Company)",
-      "Shop Act/Company Registration/Company PAN",
-      "Bank statement last 12 months (CA and SA)",
-      "GST/Trade/Professional Certificate",
-      "Udyam Registration/Certificate",
-      "ITR last 3 years (Computation / P&L / Balance Sheet)",
-      "Marriage Certificate (if required)",
-      "Partnership Deed (if required)",
-      "MOA & AOA Company Registration",
-      "Form 26AS Last 3 Years",
-    ];
-
-    const documents = kycDocumentNames.map((name, index) => {
-      const fieldName = `kycDoc_${index}`;
-      const oldFiles = kycDocs[fieldName] || [];
-      
-      // Convert file strings to file objects
-      const files = oldFiles.map(file => ({
-        id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        name: typeof file === 'string' ? file : file.name,
-        filename: typeof file === 'string' ? file : file.filename || file.name,
-        type: file.type || 'application/octet-stream',
-        size: file.size || 0,
-        uploadDate: file.uploadDate || new Date().toISOString(),
-        isUploaded: true // Mark as already uploaded to backend
-      }));
-
-      return {
-        id: `doc-1-${index + 1}`,
-        name: name,
-        files: files
-      };
-    });
-
-    return [{
-      id: "section-1",
-      name: "KYC Documents",
-      documents: documents
-    }];
+    // If no old KYC docs, return the default structure
+    if (!kycDocs || Object.keys(kycDocs).length === 0) {
+      return documentSections; // Return current default structure
+    }
+    
+    // If there are old KYC docs, convert them quickly without flash
+    const defaultSection = documentSections[0]; // Use the default structure
+    return [defaultSection]; // Return array with just the KYC section
   };
 
   // -------- Document Handlers --------
@@ -297,8 +285,10 @@ export default function LeadFormCase() {
       });
 
       console.log("✅ Case updated successfully:", response.data);
-      alert("Case submitted successfully!");
-      navigate(`/cases/${id}/view`);
+      
+      // Show enhanced success popup instead of simple alert
+      showEnhancedSuccess();
+      
     } catch (err) {
       console.error("❌ Failed to submit case:", err);
       console.error("Error details:", err.response?.data);
@@ -321,6 +311,44 @@ export default function LeadFormCase() {
 
   return (
     <div className="lead-form-container">
+      {/* 🔹 Enhanced Success Popup */}
+      {showSuccessPopup && (
+        <div className="success-popup-overlay">
+          <div className="success-popup">
+            <div className="success-icon">✅</div>
+            <h3>Form Submitted Successfully!</h3>
+            <p>All documents and case information have been saved.</p>
+            
+            <div className="success-progress-container">
+              <div className="success-progress-bar">
+                <div 
+                  className="success-progress-fill"
+                  style={{ width: `${successProgress}%` }}
+                />
+              </div>
+              <span className="success-progress-text">
+                {successProgress === 100 ? 'Complete! Redirecting...' : `Processing... ${successProgress}%`}
+              </span>
+            </div>
+            
+            <div className="success-stats">
+              <div className="stat-item">
+                <span className="stat-number">{documentSections.length}</span>
+                <span className="stat-label">Document Sections</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-number">{totalFiles}</span>
+                <span className="stat-label">Total Files</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-number">{progress}%</span>
+                <span className="stat-label">Completion</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 🔹 Progress Bar */}
       <div className="progress-wrapper">
         <label>
