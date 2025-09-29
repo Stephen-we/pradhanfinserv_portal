@@ -77,4 +77,4 @@ Thumbs.db
 
 # DynamoDB Local files
 .dynamodb/
-EOFserver/server/uploads/
+server/server/uploads/
