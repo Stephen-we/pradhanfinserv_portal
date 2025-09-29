@@ -20,8 +20,14 @@ const CaseSchema = new mongoose.Schema(
     loanType: {
       type: String,
       enum: [
-        "Home Loan","Personal Loan","Business Loan","Education Loan",
-        "Vehicle Loan","LAP","MSME","LRD",
+        "Home Loan",
+        "Personal Loan",
+        "Business Loan",
+        "Education Loan",
+        "Vehicle Loan",
+        "LAP",
+        "MSME",
+        "LRD",
       ],
       default: "Home Loan",
     },
@@ -36,14 +42,14 @@ const CaseSchema = new mongoose.Schema(
     siteAddress: { type: String },
     officeAddress: { type: String },
 
-    // KYC (quick fields)
-    pan: { type: String },
-    aadhar: { type: String },
+    // KYC quick fields
+    panNumber: { type: String },
+    aadharNumber: { type: String },
 
-    // 🔹 NEW: dynamic KYC uploads (key -> url/path)
+    // 🔹 Dynamic KYC uploads
+    // Example: { "kycDoc_0": ["file1.pdf","file2.png"] }
     kycDocs: {
-      type: Map,
-      of: String,
+      type: Object,   // ✅ Fix: use plain object instead of Map
       default: {},
     },
 

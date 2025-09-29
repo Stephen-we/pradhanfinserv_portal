@@ -22,17 +22,29 @@ dotenv.config();
 const app = express();
 
 // ---- Middleware ----
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+let allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
+  .map((o) => o.trim())
   .filter(Boolean);
 
+// ✅ Add default localhost origins if none defined
+if (allowedOrigins.length === 0) {
+  allowedOrigins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+  ];
+}
+
+// ✅ CORS setup
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         cb(null, true);
       } else {
-        cb(new Error("Not allowed by CORS"));
+        cb(new Error(`Not allowed by CORS: ${origin}`));
       }
     },
     credentials: true,
@@ -62,7 +74,7 @@ app.use("/api/leads", leadRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/cases", caseRoutes);
 
-// ✅ Fix: use /channel-partners to match frontend
+// ✅ Match frontend route: /channel-partners
 app.use("/api/channel-partners", partnerRoutes);
 
 app.use("/api/branches", branchRoutes);
@@ -71,7 +83,7 @@ app.use("/api/customer-docs", customerDocs);
 app.use("/api/tasks", taskRoutes);
 
 // ---- Static Uploads ----
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "server", "uploads")));
 
 // ---- Error Handler ----
 app.use((err, req, res, next) => {
@@ -81,6 +93,4 @@ app.use((err, req, res, next) => {
 
 // ---- Start ----
 const PORT = process.env.PORT || 5000;
- app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
-
-
+app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
