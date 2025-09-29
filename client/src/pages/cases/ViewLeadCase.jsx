@@ -110,107 +110,134 @@ export default function ViewLeadCase() {
   };
 
   // -------- File URL Helper --------
-  const getFileUrl = (file) => {
-    if (!file) return null;
-    
-    // If it's already a full URL
-    if (typeof file === 'string' && file.startsWith('http')) return file;
-    
-    // If it has a filename (already uploaded file)
-    if (file.filename) {
-      return `${filesBase}/uploads/${file.filename}`;
-    }
-    
-    // If it's a plain string filename
-    if (typeof file === 'string') {
-      return `${filesBase}/uploads/${file}`;
-    }
-    
-    // If it's a File object (new upload - should not happen in view)
-    if (file.file) {
-      return URL.createObjectURL(file.file);
-    }
-    
-    return null;
-  };
+const getFileUrl = (file) => {
+  if (!file) return null;
+  
+  console.log("🔍 Processing file object:", file);
+  
+  // If it's already a full URL
+  if (typeof file === 'string' && file.startsWith('http')) return file;
+  
+  // Try multiple filename fields
+  const filename = file.filename || file.name || (typeof file === 'string' ? file : null);
+  
+  if (filename) {
+    const fileUrl = `${filesBase}/uploads/${filename}`;
+    console.log(`🔗 Generated file URL: ${fileUrl}`);
+    return fileUrl;
+  }
+  
+  console.warn("❌ Could not generate URL for file:", file);
+  return null;
+};
 
-  // -------- Document Statistics --------
-  const getDocumentStats = () => {
-    if (!caseData) return { totalFiles: 0, totalSections: 0 };
-    
-    if (caseData.documentSections && caseData.documentSections.length > 0) {
-      const totalFiles = caseData.documentSections.reduce((total, section) => 
-        total + section.documents.reduce((docTotal, doc) => 
-          docTotal + (doc.files ? doc.files.length : 0), 0
-        ), 0
-      );
-      return { totalFiles, totalSections: caseData.documentSections.length };
-    }
-    
-    if (caseData.kycDocs) {
-      const totalFiles = Object.values(caseData.kycDocs).flat().length;
-      return { totalFiles, totalSections: 1 };
-    }
-    
-    return { totalFiles: 0, totalSections: 0 };
-  };
-
-  // -------- Download Handler --------
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      setDownloadProgress(0);
-
-      // Check if there are any documents to download
-      const stats = getDocumentStats();
-      if (stats.totalFiles === 0) {
-        alert("No documents available for download");
-        setIsDownloading(false);
-        return;
-      }
-
-      console.log(`Starting download for case ${caseData._id} with ${stats.totalFiles} files`);
-
-      const res = await API.get(`/cases/${caseData._id}/download`, {
-        responseType: "blob",
-        onDownloadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setDownloadProgress(percent);
-          }
+// -------- Enhanced Document Statistics --------
+const getDocumentStats = () => {
+  if (!caseData) return { totalFiles: 0, totalSections: 0, fileDetails: [] };
+  
+  let totalFiles = 0;
+  let fileDetails = [];
+  
+  if (caseData.documentSections && caseData.documentSections.length > 0) {
+    caseData.documentSections.forEach((section, sectionIndex) => {
+      section.documents.forEach((doc, docIndex) => {
+        if (doc.files && doc.files.length > 0) {
+          doc.files.forEach((file, fileIndex) => {
+            totalFiles++;
+            fileDetails.push({
+              section: section.name,
+              document: doc.name,
+              file: file,
+              url: getFileUrl(file)
+            });
+          });
         }
       });
-      
-      const blob = new Blob([res.data], { type: "application/zip" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${caseData.customerName || "case"}_documents_${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      
-      setDownloadProgress(100);
-      setTimeout(() => {
-        setDownloadProgress(0);
-        setIsDownloading(false);
-      }, 2000);
-      
-    } catch (err) {
-      console.error("Download error:", err);
-      setIsDownloading(false);
-      setDownloadProgress(0);
-      
-      if (err.response?.status === 404) {
-        alert("Download feature not available. Please ensure the server has the download endpoint implemented.");
-      } else {
-        const msg = err.response?.data?.message || err.message || "Download failed";
-        alert(`Failed to download documents: ${msg}`);
-      }
-    }
+    });
+  } else if (caseData.kycDocs) {
+    Object.entries(caseData.kycDocs).forEach(([fieldName, files]) => {
+      const fileArray = Array.isArray(files) ? files : [files].filter(Boolean);
+      fileArray.forEach(file => {
+        totalFiles++;
+        fileDetails.push({
+          section: 'KYC Documents',
+          document: fieldName,
+          file: file,
+          url: getFileUrl(file)
+        });
+      });
+    });
+  }
+  
+  console.log(`📊 Document stats: ${totalFiles} files found`, fileDetails);
+  return { 
+    totalFiles, 
+    totalSections: caseData.documentSections?.length || 1,
+    fileDetails 
   };
+};
 
+// -------- Enhanced Download Handler --------
+const handleDownload = async () => {
+  try {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+
+    // Check if there are any documents to download
+    const stats = getDocumentStats();
+    console.log(`📥 Download request for ${stats.totalFiles} files`);
+    
+    if (stats.totalFiles === 0) {
+      alert("No documents available for download");
+      setIsDownloading(false);
+      return;
+    }
+
+    // Show file details in console for debugging
+    console.log("📋 Files to download:", stats.fileDetails);
+
+    const res = await API.get(`/cases/${caseData._id}/download`, {
+      responseType: "blob",
+      onDownloadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setDownloadProgress(percent);
+        }
+      }
+    });
+    
+    const blob = new Blob([res.data], { type: "application/zip" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${caseData.customerName || "case"}_documents_${new Date().toISOString().split('T')[0]}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    
+    setDownloadProgress(100);
+    setTimeout(() => {
+      setDownloadProgress(0);
+      setIsDownloading(false);
+    }, 2000);
+    
+  } catch (err) {
+    console.error("Download error:", err);
+    setIsDownloading(false);
+    setDownloadProgress(0);
+    
+    if (err.response?.status === 404) {
+      alert("No documents found for download. The files might not exist on the server.");
+    } else if (err.response?.data?.message) {
+      alert(`Download failed: ${err.response.data.message}`);
+    } else {
+      alert("Download failed. Please check the server logs for details.");
+    }
+  }
+};
+
+ 
   const hasCoApplicant = !!(caseData?.applicant2Name && caseData.applicant2Name !== "");
   const documentStats = getDocumentStats();
 

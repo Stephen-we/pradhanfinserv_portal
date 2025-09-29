@@ -15,16 +15,24 @@ const storage = multer.diskStorage({
     const ext = path.extname(file.originalname);
     const name = path.basename(file.originalname, ext).replace(/\s+/g, "_");
     const filename = `${name}-${Date.now()}${ext}`;
-    console.log(`📁 Multer filename: ${filename}`);
+     console.log(`📁 Multer saved as: ${filename}`);
     cb(null, filename);
   },
 });
 
-// Enhanced multer configuration
-export const upload = multer({ 
+// More permissive multer configuration
+const multerConfig = {
   storage,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
-    fieldSize: 100 * 1024 * 1024, // 100MB for non-file fields
+    fileSize: 200 * 1024 * 1024, // 200MB limit
+    fieldSize: 200 * 1024 * 1024, // 200MB for non-file fields
+  },
+  fileFilter: (req, file, cb) => {
+    console.log(`🔍 Multer file filter: ${file.fieldname} - ${file.originalname} - ${file.mimetype}`);
+    cb(null, true); // Accept all files
   }
-});
+};
+
+const upload = multer(multerConfig);
+
+export { upload };

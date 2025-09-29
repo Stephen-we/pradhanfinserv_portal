@@ -1,4 +1,4 @@
-//client/src/services/api.js
+// client/src/services/api.js
 import axios from "axios";
 import { isTokenExpired } from "../utils/jwt";
 
@@ -23,7 +23,14 @@ API.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    config.headers["Content-Type"] = "application/json";
+
+    // ✅ Fix: Don't set Content-Type for FormData - let browser set it automatically
+    if (!(config.data instanceof FormData)) {
+      config.headers["Content-Type"] = "application/json";
+    }
+    // If it's FormData, the browser will automatically set the Content-Type with boundary
+    // and removing the Content-Type header entirely lets axios handle it properly
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -56,8 +63,20 @@ API.interceptors.response.use(
 export const channelPartnersAPI = {
   getAll: (params = {}) => API.get("/channel-partners", { params }),
   getById: (id) => API.get(`/channel-partners/${id}`),
-  create: (data) => API.post("/channel-partners", data),
-  update: (id, data) => API.put(`/channel-partners/${id}`, data),
+  create: (data) => {
+    // Handle both regular JSON data and FormData for file uploads
+    if (data instanceof FormData) {
+      return API.post("/channel-partners", data);
+    }
+    return API.post("/channel-partners", data);
+  },
+  update: (id, data) => {
+    // Handle both regular JSON data and FormData for file uploads
+    if (data instanceof FormData) {
+      return API.put(`/channel-partners/${id}`, data);
+    }
+    return API.put(`/channel-partners/${id}`, data);
+  },
   delete: (id) => API.delete(`/channel-partners/${id}`),
 };
 

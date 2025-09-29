@@ -1,4 +1,4 @@
-// server/src/models/Case.js
+//server/src/models/Case.js
 import mongoose from "mongoose";
 
 const CaseSchema = new mongoose.Schema(
@@ -46,11 +46,17 @@ const CaseSchema = new mongoose.Schema(
     panNumber: { type: String },
     aadharNumber: { type: String },
 
-    // 🔹 Dynamic KYC uploads
+    // 🔹 Legacy KYC uploads
     // Example: { "kycDoc_0": ["file1.pdf","file2.png"] }
     kycDocs: {
-      type: Object,   // ✅ Fix: use plain object instead of Map
+      type: Object,
       default: {},
+    },
+
+    // 🔹 New structured document sections (section → docs → files)
+    documentSections: {
+      type: Array, // keep flexible so it won’t break existing client/server code
+      default: [],
     },
 
     // Extra

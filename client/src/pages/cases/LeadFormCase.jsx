@@ -15,22 +15,22 @@ export default function LeadFormCase() {
   // ✅ Document Management State
   const [documentSections, setDocumentSections] = useState([
     {
-      id: 1,
+      id: "section-1",
       name: "KYC Documents",
       documents: [
-        { id: 1, name: "Photo 4 each (A & C)", files: [] },
-        { id: 2, name: "PAN Self attested - A & C", files: [] },
-        { id: 3, name: "Aadhar - self attested - A & C", files: [] },
-        { id: 4, name: "Address Proof (Resident & Shop/Company)", files: [] },
-        { id: 5, name: "Shop Act/Company Registration/Company PAN", files: [] },
-        { id: 6, name: "Bank statement last 12 months (CA and SA)", files: [] },
-        { id: 7, name: "GST/Trade/Professional Certificate", files: [] },
-        { id: 8, name: "Udyam Registration/Certificate", files: [] },
-        { id: 9, name: "ITR last 3 years (Computation / P&L / Balance Sheet)", files: [] },
-        { id: 10, name: "Marriage Certificate (if required)", files: [] },
-        { id: 11, name: "Partnership Deed (if required)", files: [] },
-        { id: 12, name: "MOA & AOA Company Registration", files: [] },
-        { id: 13, name: "Form 26AS Last 3 Years", files: [] },
+        { id: "doc-1-1", name: "Photo 4 each (A & C)", files: [] },
+        { id: "doc-1-2", name: "PAN Self attested - A & C", files: [] },
+        { id: "doc-1-3", name: "Aadhar - self attested - A & C", files: [] },
+        { id: "doc-1-4", name: "Address Proof (Resident & Shop/Company)", files: [] },
+        { id: "doc-1-5", name: "Shop Act/Company Registration/Company PAN", files: [] },
+        { id: "doc-1-6", name: "Bank statement last 12 months (CA and SA)", files: [] },
+        { id: "doc-1-7", name: "GST/Trade/Professional Certificate", files: [] },
+        { id: "doc-1-8", name: "Udyam Registration/Certificate", files: [] },
+        { id: "doc-1-9", name: "ITR last 3 years (Computation / P&L / Balance Sheet)", files: [] },
+        { id: "doc-1-10", name: "Marriage Certificate (if required)", files: [] },
+        { id: "doc-1-11", name: "Partnership Deed (if required)", files: [] },
+        { id: "doc-1-12", name: "MOA & AOA Company Registration", files: [] },
+        { id: "doc-1-13", name: "Form 26AS Last 3 Years", files: [] },
       ]
     }
   ]);
@@ -83,23 +83,24 @@ export default function LeadFormCase() {
       
       // Convert file strings to file objects
       const files = oldFiles.map(file => ({
-        id: Date.now() + Math.random(),
+        id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: typeof file === 'string' ? file : file.name,
-        filename: typeof file === 'string' ? file : file.name,
-        type: 'uploaded', // Mark as already uploaded
-        size: 0,
-        uploadDate: new Date().toISOString()
+        filename: typeof file === 'string' ? file : file.filename || file.name,
+        type: file.type || 'application/octet-stream',
+        size: file.size || 0,
+        uploadDate: file.uploadDate || new Date().toISOString(),
+        isUploaded: true // Mark as already uploaded to backend
       }));
 
       return {
-        id: index + 1,
+        id: `doc-1-${index + 1}`,
         name: name,
         files: files
       };
     });
 
     return [{
-      id: 1,
+      id: "section-1",
       name: "KYC Documents",
       documents: documents
     }];
@@ -115,13 +116,14 @@ export default function LeadFormCase() {
       const currentDocument = currentSection.documents[docIndex];
       
       const newFiles = fileList.map(file => ({
-        id: Date.now() + Math.random(),
+        id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: file.name,
         file: file, // Actual File object for new uploads
         filename: file.name,
         type: file.type,
         size: file.size,
-        uploadDate: new Date().toISOString()
+        uploadDate: new Date().toISOString(),
+        isUploaded: false // Mark as new file to be uploaded
       }));
 
       // Add new files to existing ones
@@ -143,10 +145,14 @@ export default function LeadFormCase() {
     setDocumentSections(prev => [
       ...prev,
       {
-        id: Date.now(),
-        name: `Additional Documents ${prev.length}`,
+        id: `section-${Date.now()}`,
+        name: `Additional Documents ${prev.length + 1}`,
         documents: [
-          { id: Date.now() + 1, name: "New Document Type", files: [] }
+          { 
+            id: `doc-${prev.length + 1}-1`, 
+            name: "New Document Type", 
+            files: [] 
+          }
         ]
       }
     ]);
@@ -163,8 +169,11 @@ export default function LeadFormCase() {
   const addDocumentType = (sectionIndex) => {
     setDocumentSections(prev => {
       const updatedSections = [...prev];
-      updatedSections[sectionIndex].documents.push({
-        id: Date.now(),
+      const section = updatedSections[sectionIndex];
+      const newDocIndex = section.documents.length + 1;
+      
+      section.documents.push({
+        id: `doc-${sectionIndex + 1}-${newDocIndex}`,
         name: "New Document Type",
         files: []
       });
@@ -260,35 +269,53 @@ export default function LeadFormCase() {
       // ✅ Append document sections structure
       fd.append('documentSections', JSON.stringify(documentSections));
 
-      // ✅ Append all files from document sections
-     let totalFiles = 0;
-        documentSections.forEach((section, sectionIndex) => {
-          section.documents.forEach((doc, docIndex) => {
-            doc.files.forEach((fileObj, fileIndex) => {
-              if (fileObj.file) { // Only append new files, not already uploaded ones
-                // Use the pattern: doc_sectionIndex_docIndex_fileIndex
-                fd.append(`doc_${sectionIndex}_${docIndex}_${fileIndex}`, fileObj.file);
-                totalFiles++;
-                 console.log(`📤 Appending file: doc_${sectionIndex}_${docIndex}_${fileIndex} - ${fileObj.name}`);
-              }
-            });
+      // ✅ Append all files from document sections WITH METADATA
+      let totalFiles = 0;
+      documentSections.forEach((section, sectionIndex) => {
+        section.documents.forEach((doc, docIndex) => {
+          doc.files.forEach((fileObj, fileIndex) => {
+            // Only append new files (not already uploaded ones)
+            if (fileObj.file && !fileObj.isUploaded) {
+              fd.append('documents', fileObj.file);
+              
+              // 🔥 CRITICAL: Append metadata for backend mapping
+              fd.append('documents_sectionIndex', sectionIndex.toString());
+              fd.append('documents_docIndex', docIndex.toString());
+              fd.append('documents_docId', doc.id);
+              
+              console.log(`📤 Appending file: ${fileObj.name} to section ${sectionIndex}, doc ${docIndex}, id: ${doc.id}`);
+              totalFiles++;
+            }
           });
         });
+      });
 
-         console.log(`📤 Submitting form with ${totalFiles} new files`);
+      console.log(`📦 Submitting form with ${totalFiles} new files and ${documentSections.length} document sections`);
 
-        // IMPORTANT: Don't set Content-Type header - let browser set it automatically
-    await API.put(`/cases/${id}`, fd);
+      const response = await API.put(`/cases/${id}`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-    alert("Case submitted successfully!");
-    navigate(`/cases/${id}/view`);
-  } catch (err) {
-    console.error("❌ Failed to submit case:", err);
-    alert(err.response?.data?.message || "Failed to submit case");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      console.log("✅ Case updated successfully:", response.data);
+      alert("Case submitted successfully!");
+      navigate(`/cases/${id}/view`);
+    } catch (err) {
+      console.error("❌ Failed to submit case:", err);
+      console.error("Error details:", err.response?.data);
+      alert(err.response?.data?.message || "Failed to submit case");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Helper to count total files
+  const totalFiles = useMemo(() => {
+    return documentSections.reduce((total, section) => {
+      return total + section.documents.reduce((docTotal, doc) => {
+        return docTotal + doc.files.length;
+      }, 0);
+    }, 0);
+  }, [documentSections]);
 
   if (!form) return <p>Loading...</p>;
 
@@ -297,7 +324,7 @@ export default function LeadFormCase() {
       {/* 🔹 Progress Bar */}
       <div className="progress-wrapper">
         <label>
-          <b>Progress:</b> {progress}%
+          <b>Progress:</b> {progress}% | <b>Total Files:</b> {totalFiles}
         </label>
         <div className="progress-bar">
           <div
@@ -321,6 +348,7 @@ export default function LeadFormCase() {
             name="loanType"
             value={form.loanType || ""}
             onChange={handleChange}
+            required
           />
         </div>
         <div className="section">
@@ -330,36 +358,40 @@ export default function LeadFormCase() {
             name="amount"
             value={form.amount || ""}
             onChange={handleChange}
+            required
           />
         </div>
 
         {/* Applicant Details */}
         <h3 className="form-section-title">Applicant Details</h3>
         <div className="section">
-          <label>Applicant Name</label>
+          <label>Applicant Name *</label>
           <input
             type="text"
             name="customerName"
             value={form.customerName || ""}
             onChange={handleChange}
+            required
           />
         </div>
         <div className="section">
-          <label>Mobile</label>
+          <label>Mobile *</label>
           <input
             type="text"
             name="mobile"
             value={form.mobile || ""}
             onChange={handleChange}
+            required
           />
         </div>
         <div className="section">
-          <label>Email</label>
+          <label>Email *</label>
           <input
             type="email"
             name="email"
             value={form.email || ""}
             onChange={handleChange}
+            required
           />
         </div>
 
@@ -418,11 +450,12 @@ export default function LeadFormCase() {
         {/* Contact Details */}
         <h3 className="form-section-title">Contact Details</h3>
         <div className="section">
-          <label>Permanent Address</label>
+          <label>Permanent Address *</label>
           <textarea
             name="permanentAddress"
             value={form.permanentAddress || ""}
             onChange={handleChange}
+            required
           />
         </div>
         <div className="section">
@@ -481,13 +514,16 @@ export default function LeadFormCase() {
         <div className="document-sections-container">
           <div className="section-header">
             <h3 className="form-section-title">Document Uploads</h3>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={addDocumentSection}
-            >
-              + Add New Section
-            </button>
+            <div>
+              <span className="file-count-badge">{totalFiles} files total</span>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={addDocumentSection}
+              >
+                + Add New Section
+              </button>
+            </div>
           </div>
 
           {documentSections.map((section, sectionIndex) => (
@@ -502,6 +538,7 @@ export default function LeadFormCase() {
                     updatedSections[sectionIndex].name = e.target.value;
                     setDocumentSections(updatedSections);
                   }}
+                  placeholder="Section Name"
                 />
                 {documentSections.length > 1 && (
                   <button
@@ -522,14 +559,18 @@ export default function LeadFormCase() {
                       className="document-type-input"
                       value={doc.name}
                       onChange={(e) => updateDocumentTypeName(sectionIndex, docIndex, e.target.value)}
+                      placeholder="Document Type Name"
                     />
+                    <span className="file-count">
+                      {doc.files.length} file(s)
+                    </span>
                     {section.documents.length > 1 && (
                       <button
                         type="button"
                         className="btn danger small"
                         onClick={() => removeDocumentType(sectionIndex, docIndex)}
                       >
-                        ✕
+                        ✕ Remove
                       </button>
                     )}
                   </div>
@@ -539,8 +580,11 @@ export default function LeadFormCase() {
                     {doc.files.map((file, fileIndex) => (
                       <div key={file.id} className="file-item">
                         <span className="file-name">{file.name}</span>
+                        <span className={`file-status ${file.isUploaded ? 'uploaded' : 'new'}`}>
+                          {file.isUploaded ? '(Uploaded)' : '(New)'}
+                        </span>
                         <span className="file-size">
-                          {file.size > 0 ? `(${Math.round(file.size / 1024)} KB)` : '(Uploaded)'}
+                          {file.size > 0 ? `(${Math.round(file.size / 1024)} KB)` : ''}
                         </span>
                         <button
                           type="button"
@@ -565,7 +609,7 @@ export default function LeadFormCase() {
                         }}
                         style={{ display: 'none' }}
                       />
-                      + Add Multiple Files
+                      📁 Add Multiple Files
                     </label>
                     <label className="btn secondary small">
                       <input
@@ -576,7 +620,7 @@ export default function LeadFormCase() {
                         }}
                         style={{ display: 'none' }}
                       />
-                      + Add Single File
+                      📄 Add Single File
                     </label>
                   </div>
                 </div>
@@ -603,7 +647,7 @@ export default function LeadFormCase() {
             ← Back
           </button>
           <button type="submit" className="btn primary" disabled={isSubmitting}>
-            {isSubmitting ? "Submitting..." : "Submit"}
+            {isSubmitting ? "Submitting..." : `Submit Case (${progress}%)`}
           </button>
         </div>
       </form>
