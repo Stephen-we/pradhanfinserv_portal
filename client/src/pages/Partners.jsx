@@ -6,9 +6,11 @@ import DataTable from "../components/DataTable";
 export default function Partners(){ 
   const [state,setState] = useState({ items:[], page:1, pages:1, q:"" });
   const [form,setForm] = useState({ name:"", contactNumber:"", products:[], commission:0 });
-  const load = ()=> API.get("/partners", { params: { page: state.page, q: state.q } }).then(r=>setState(s=>({ ...s, items:r.data.items, pages:r.data.pages })));
+  const load = ()=> API.get("/channel-partners", { params: { page: state.page, q: state.q } }).then(r=>setState(s=>({ ...s, items:r.data.items, pages:r.data.pages })));
   useEffect(()=>{ load(); },[state.page, state.q]);
-  const add = async ()=>{ await API.post("/partners", form); setForm({ name:"", contactNumber:"", products:[], commission:0 }); load(); };
+  const add = async ()=>{ await API.post("/channel-partners", form); setForm({ name:"", contactNumber:"", products:[], commission:0 }); load(); };
+ 
+
 
   return (<div>
     <header><h1>Channel Partners</h1></header>
