@@ -21,6 +21,8 @@ import EditBranch from "./pages/EditBranch";
 import ViewLeadCase from "./pages/cases/ViewLeadCase";
 import LeadFormCase from "./pages/cases/LeadFormCase";
 import CaseTasks from "./pages/cases/CaseTasks";
+import PartnerView from "./pages/PartnerView"; // ✅ ADD THIS IMPORT
+import EditPartner from "./pages/EditPartner"; // ✅ ADD THIS FOR EDIT FUNCTIONALITY
 
 // Layouts
 import MainLayout from "./layouts/MainLayout";
@@ -150,12 +152,28 @@ export default function App() {
         }
       />
 
-      {/* Partners */}
+      {/* Partners Routes - ✅ FIXED */}
       <Route
         path="/partners"
         element={
           <Protected>
             <MainLayout><Partners /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/partners/:id/view"
+        element={
+          <Protected>
+            <MainLayout><PartnerView /></MainLayout>
+          </Protected>
+        }
+      />
+      <Route
+        path="/partners/:id/edit"
+        element={
+          <Protected>
+            <MainLayout><EditPartner /></MainLayout>
           </Protected>
         }
       />
