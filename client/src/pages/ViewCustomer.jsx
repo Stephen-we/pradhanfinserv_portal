@@ -13,8 +13,8 @@ export default function ViewCustomer() {
   const [showDisbursementForm, setShowDisbursementForm] = useState(false);
   const [newDisbursement, setNewDisbursement] = useState({
     amount: "",
-    date: new Date().toISOString().split('T')[0],
-    notes: ""
+    date: new Date().toISOString().split("T")[0],
+    notes: "",
   });
 
   const loadCustomer = async () => {
@@ -58,7 +58,7 @@ export default function ViewCustomer() {
   const handleDisbursementChange = (e) => {
     setNewDisbursement({
       ...newDisbursement,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
@@ -72,13 +72,13 @@ export default function ViewCustomer() {
     try {
       await API.post(`/customers/${id}/disbursements`, {
         ...newDisbursement,
-        amount: parseFloat(newDisbursement.amount)
+        amount: parseFloat(newDisbursement.amount),
       });
-      
+
       setNewDisbursement({
         amount: "",
-        date: new Date().toISOString().split('T')[0],
-        notes: ""
+        date: new Date().toISOString().split("T")[0],
+        notes: "",
       });
       setShowDisbursementForm(false);
       loadDisbursements();
@@ -107,7 +107,7 @@ export default function ViewCustomer() {
   if (!customer) return <div className="customer-profile">Loading...</div>;
 
   const totalDisbursed = disbursements.reduce((sum, d) => sum + d.amount, 0);
-  const isCustomerClosed = customer.status === 'close';
+  const isCustomerClosed = customer.status === "close";
 
   return (
     <div className="customer-profile">
@@ -125,7 +125,10 @@ export default function ViewCustomer() {
       {/* Grid Layout */}
       <div className="profile-grid">
         {/* Sidebar */}
-        <div className="profile-sidebar" style={{height: 'fit-content', minHeight: '400px'}}>
+        <div
+          className="profile-sidebar"
+          style={{ height: "fit-content", minHeight: "400px" }}
+        >
           <label className="avatar">
             {customer.photo ? (
               <>
@@ -179,30 +182,41 @@ export default function ViewCustomer() {
             <h4>Status</h4>
             <p className={isCustomerClosed ? "status-close" : "status-open"}>
               {customer.status ? customer.status.toUpperCase() : "OPEN"}
-              {isCustomerClosed ? ' 🔒' : ' 🔓'}
+              {isCustomerClosed ? " 🔒" : " 🔓"}
             </p>
           </div>
-          
+
           {/* Disbursement Amount Card */}
           <div className="detail-card disbursement-card">
             <div className="disbursement-header">
               <div>
                 <h4>Disbursed Amount</h4>
                 <span className="status-indicator">
-                  Status: {customer.status || 'open'} {isCustomerClosed ? '🔒' : '🔓'}
+                  Status: {customer.status || "open"}{" "}
+                  {isCustomerClosed ? "🔒" : "🔓"}
                 </span>
               </div>
-              <button 
-                className={`icon-btn small ${isCustomerClosed ? 'disabled' : ''}`}
-                onClick={() => !isCustomerClosed && setShowDisbursementForm(!showDisbursementForm)}
-                title={isCustomerClosed ? "Cannot add disbursement to closed customer" : "Add Disbursement"}
+              <button
+                className={`icon-btn small ${
+                  isCustomerClosed ? "disabled" : ""
+                }`}
+                onClick={() =>
+                  !isCustomerClosed && setShowDisbursementForm(!showDisbursementForm)
+                }
+                title={
+                  isCustomerClosed
+                    ? "Cannot add disbursement to closed customer"
+                    : "Add Disbursement"
+                }
                 disabled={isCustomerClosed}
               >
                 <FiPlus size={16} />
               </button>
             </div>
-            <p className="disbursement-amount">₹{totalDisbursed.toLocaleString()}</p>
-            
+            <p className="disbursement-amount">
+              ₹{totalDisbursed.toLocaleString()}
+            </p>
+
             {/* Disbursement Form */}
             {showDisbursementForm && !isCustomerClosed && (
               <div className="disbursement-form">
@@ -240,8 +254,8 @@ export default function ViewCustomer() {
                     />
                   </div>
                   <div className="form-actions">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="btn secondary"
                       onClick={() => setShowDisbursementForm(false)}
                     >
@@ -268,9 +282,18 @@ export default function ViewCustomer() {
                       ₹{disbursement.amount.toLocaleString()}
                     </span>
                     <button
-                      className={`icon-btn small danger ${isCustomerClosed ? 'disabled' : ''}`}
-                      onClick={() => !isCustomerClosed && deleteDisbursement(disbursement._id)}
-                      title={isCustomerClosed ? "Cannot delete disbursement from closed customer" : "Delete disbursement"}
+                      className={`icon-btn small danger ${
+                        isCustomerClosed ? "disabled" : ""
+                      }`}
+                      onClick={() =>
+                        !isCustomerClosed &&
+                        deleteDisbursement(disbursement._id)
+                      }
+                      title={
+                        isCustomerClosed
+                          ? "Cannot delete disbursement from closed customer"
+                          : "Delete disbursement"
+                      }
                       disabled={isCustomerClosed}
                     >
                       <FiTrash2 size={12} />
@@ -278,7 +301,7 @@ export default function ViewCustomer() {
                   </div>
                 ))}
                 {disbursements.length > 3 && (
-                  <button 
+                  <button
                     className="view-all-btn"
                     onClick={() => navigate(`/customers/${id}/edit`)}
                   >
@@ -291,14 +314,7 @@ export default function ViewCustomer() {
             {disbursements.length === 0 && !showDisbursementForm && (
               <div className="no-disbursements">
                 <p>No disbursements recorded yet.</p>
-                {!isCustomerClosed && (
-                  <button 
-                    className="btn success small"
-                    onClick={() => setShowDisbursementForm(true)}
-                  >
-                    <FiPlus size={14} /> Add First Disbursement
-                  </button>
-                )}
+                {/* 🔴 Removed "Add First Disbursement" button here */}
               </div>
             )}
           </div>

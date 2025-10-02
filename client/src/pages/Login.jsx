@@ -1,11 +1,16 @@
 // client/src/pages/Login.jsx
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
 import API from "../services/api";
-import logo from "../assets/logo.png";
-import img1 from "../assets/1.png";
-import img2 from "../assets/2.png";
-import img3 from "../assets/3.png";
+
+// ⬇️ Updated path to new logo
+import logo from "../assets/logo/logo.png";  // ✅ NEW PATH
+
+import img1 from "../assets/1.png";     // ✅ CORRECT PATH
+import img2 from "../assets/2.png";     // ✅ CORRECT PATH
+import img3 from "../assets/3.png";     // ✅ CORRECT PATH
 
 // ✅ Slides with images + messages
 const slides = [
@@ -19,6 +24,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [current, setCurrent] = useState(0);
+
   const navigate = useNavigate();
 
   // ✅ Auto rotation
@@ -38,11 +44,10 @@ export default function Login() {
     e.preventDefault();
     try {
       const { data } = await API.post("/auth/login", { email, password });
-        // 👇 Add this line
       console.log("🔑 Login API response:", data);
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      navigate("/dashboard");   // ✅ cleaner redirect
+      navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     }
@@ -54,6 +59,7 @@ export default function Login() {
       <div className="login-left">
         <img src={logo} alt="logo" className="logo" />
         <h2>Login into your account</h2>
+
         <form onSubmit={submit}>
           <div className="input-group">
             <span className="input-icon">👤</span>
@@ -95,6 +101,7 @@ export default function Login() {
           <img src={slides[current].img} alt="slide" className="carousel-img" />
           <button className="arrow right" onClick={goNext}>›</button>
         </div>
+
         <p className="login-message">{slides[current].message}</p>
 
         {/* Dots navigation */}
