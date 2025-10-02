@@ -1,4 +1,4 @@
-//server/src/srver.js
+// server/src/server.js
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -6,6 +6,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import mongoose from "mongoose";
 import path from "path";
+import { fileURLToPath } from "url";
 
 // ---- Routes ----
 import authRoutes from "./routes/auth.js";
@@ -22,13 +23,16 @@ import taskRoutes from "./routes/tasks.js";
 dotenv.config();
 const app = express();
 
+// ---- ES Module dirname fix ----
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // ---- Middleware ----
 let allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
-// ✅ Add default localhost origins if none defined
 if (allowedOrigins.length === 0) {
   allowedOrigins = [
     "http://localhost:5173",
@@ -74,17 +78,15 @@ app.use("/api/users", userRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/cases", caseRoutes);
-
-// ✅ Match frontend route: /channel-partners
 app.use("/api/channel-partners", partnerRoutes);
-
 app.use("/api/branches", branchRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/customer-docs", customerDocs);
 app.use("/api/tasks", taskRoutes);
 
 // ---- Static Uploads ----
-app.use("/uploads", express.static(path.join(process.cwd(), "server", "uploads")));
+// ✅ Serve files from server/uploads
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // ---- Error Handler ----
 app.use((err, req, res, next) => {

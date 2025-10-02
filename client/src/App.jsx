@@ -10,6 +10,8 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
 import Customers from "./pages/Customers";
+import ViewCustomer from "./pages/ViewCustomer";  // 👈 import it
+import EditCustomer from "./pages/EditCustomer";
 import Cases from "./pages/Cases";
 import Partners from "./pages/Partners";
 import Branches from "./pages/Branches";
@@ -23,6 +25,7 @@ import LeadFormCase from "./pages/cases/LeadFormCase";
 import CaseTasks from "./pages/cases/CaseTasks";
 import PartnerView from "./pages/PartnerView"; // ✅ ADD THIS IMPORT
 import EditPartner from "./pages/EditPartner"; // ✅ ADD THIS FOR EDIT FUNCTIONALITY
+
 
 // Layouts
 import MainLayout from "./layouts/MainLayout";
@@ -125,6 +128,23 @@ export default function App() {
           </Protected>
         }
       />
+       <Route
+          path="/customers/:id"
+          element={
+            <Protected>
+              <MainLayout><ViewCustomer /></MainLayout>
+            </Protected>
+          }
+        />
+      <Route
+          path="/customers/:id/edit"
+          element={
+            <Protected>
+              <MainLayout><EditCustomer /></MainLayout>
+            </Protected>
+          }
+        />
+
 
       {/* Cases */}
       <Route

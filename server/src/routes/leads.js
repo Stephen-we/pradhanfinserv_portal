@@ -2,6 +2,7 @@
 import express from "express";
 import Lead from "../models/Lead.js";
 import Case from "../models/Case.js";
+import Customer from "../models/Customer.js";
 import { auth } from "../middleware/auth.js";
 import { allowRoles } from "../middleware/roles.js";
 import { listWithPagination } from "../utils/paginate.js";
@@ -9,34 +10,13 @@ import { listWithPagination } from "../utils/paginate.js";
 const router = express.Router();
 
 /* ================================
-   ✅ CREATE Lead
+   ✅ Debug Route (for testing only)
 ================================ */
-router.post("/", auth, async (req, res, next) => {
-  try {
-    const lead = new Lead(req.body); // includes all fields
-    await lead.save();
-    res.status(201).json(lead);
-  } catch (e) {
-    next(e);
-  }
-});
-
-  // Add this to your leads route to populate channel partner when fetching a single lead
-  router.get('/:id', async (req, res) => {
-    try {
-      const lead = await Lead.findById(req.params.id)
-        .populate('assignedTo', 'name email') // Existing population
-        .populate('channelPartner', 'name contact email'); // Add this line to populate channel partner
-      
-      if (!lead) return res.status(404).json({ message: 'Lead not found' });
-      res.json(lead);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
+router.get("/test", (req, res) => res.json({ ok: true }));
 
 /* ================================
    ✅ LIST Leads (with pagination & filters)
+   Example: GET /api/leads?page=1&q=&status=free_pool
 ================================ */
 router.get("/", auth, async (req, res, next) => {
   try {
@@ -67,11 +47,27 @@ router.get("/", auth, async (req, res, next) => {
 });
 
 /* ================================
-   ✅ GET Single Lead
+   ✅ CREATE Lead
+================================ */
+router.post("/", auth, async (req, res, next) => {
+  try {
+    const lead = new Lead(req.body);
+    await lead.save();
+    res.status(201).json(lead);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/* ================================
+   ✅ GET Single Lead (with population)
 ================================ */
 router.get("/:id", auth, async (req, res, next) => {
   try {
-    const lead = await Lead.findById(req.params.id).populate("assignedTo", "name role");
+    const lead = await Lead.findById(req.params.id)
+      .populate("assignedTo", "name email role")
+      .populate("channelPartner", "name contact email");
+
     if (!lead) return res.status(404).json({ message: "Lead not found" });
     res.json(lead);
   } catch (e) {
@@ -80,7 +76,7 @@ router.get("/:id", auth, async (req, res, next) => {
 });
 
 /* ================================
-   ✅ PUT Lead (Full Update)
+   ✅ UPDATE Lead (Full)
 ================================ */
 router.put("/:id", auth, async (req, res, next) => {
   try {
@@ -96,7 +92,7 @@ router.put("/:id", auth, async (req, res, next) => {
 });
 
 /* ================================
-   ✅ PATCH Lead (Partial Update) - NEW ROUTE
+   ✅ PATCH Lead (Partial Update)
 ================================ */
 router.patch("/:id", auth, async (req, res, next) => {
   try {
@@ -125,7 +121,10 @@ router.delete("/:id", auth, async (req, res, next) => {
 });
 
 /* ================================
-   ✅ CONVERT Lead → Archived + Case
+   ✅ CONVERT Lead → Archived + Case + Customer
+   - Uses the SAME ID: customerId = lead.leadId
+   - Saves channelPartner/bank/branch/status for Customer
+   - Idempotent (won’t create duplicates if re-run)
 ================================ */
 router.patch(
   "/:id/convert",
@@ -133,66 +132,95 @@ router.patch(
   allowRoles(["admin", "superadmin", "manager", "officer"]),
   async (req, res, next) => {
     try {
-      const lead = await Lead.findById(req.params.id);
+      const lead = await Lead.findById(req.params.id).populate("channelPartner");
       if (!lead) return res.status(404).json({ message: "Lead not found" });
 
-      // Already has case?
-      const existingCase = await Case.findOne({ leadId: lead.leadId });
-      if (existingCase) {
-        return res.json({
-          message: "Case already exists for this lead",
-          lead,
-          case: existingCase,
+      // Always archive the lead (keeps your concept intact)
+      if (lead.status !== "archived") {
+        lead.status = "archived";
+        await lead.save();
+      }
+
+      // ✅ CASE: reuse if already created
+      let caseDoc = await Case.findOne({ leadId: lead.leadId });
+      if (!caseDoc) {
+        // Ensure valid loan type
+        const validLoanTypes = [
+          "Home Loan",
+          "Personal Loan",
+          "Business Loan",
+          "Education Loan",
+          "Vehicle Loan",
+          "LAP",
+          "MSME",
+          "LRD",
+        ];
+        let chosenLoanType = lead.subType;
+        if (!validLoanTypes.includes(chosenLoanType)) chosenLoanType = "Home Loan";
+
+        caseDoc = await Case.create({
+          caseId: lead.leadId,           // <- same id as lead
+          leadId: lead.leadId,
+          loanType: chosenLoanType,
+          status: "Pending",
+          amount: lead.requirementAmount,
+          bank: lead.bank || "",
+          branch: lead.branch,
+          customerName: lead.name,
+          mobile: lead.mobile,
+          email: lead.email,
+          permanentAddress: lead.permanentAddress,
+          currentAddress: lead.currentAddress,
+          siteAddress: lead.siteAddress,
+          officeAddress: lead.officeAddress,
+          pan: lead.pan,
+          aadhar: lead.aadhar,
+          notes: lead.notes || "",
         });
       }
 
-      // Move to archived
-      lead.status = "archived";
-      await lead.save();
+      // ✅ CUSTOMER: reuse if already created (customerId = leadId)
+      let customerDoc = await Customer.findOne({ customerId: lead.leadId });
+      if (!customerDoc) {
+        customerDoc = await Customer.create({
+          customerId: lead.leadId, // <- SAME ID as lead
+          name: lead.name,
+          mobile: lead.mobile,
+          email: lead.email,
 
-      // Ensure valid loan type
-      const validLoanTypes = [
-        "Home Loan", "Personal Loan", "Business Loan", "Education Loan",
-        "Vehicle Loan", "LAP", "MSME", "LRD"
-      ];
-      let chosenLoanType = lead.subType;
-      if (!validLoanTypes.includes(chosenLoanType)) {
-        chosenLoanType = "Home Loan";
+          // Simple UI-friendly fields
+          channelPartner: lead.channelPartner?.name || "", // store name for table
+          bankName: lead.bank || "",
+          branch: lead.branch || "",
+          status: "open", // default
+
+          // Map KYC into the schema’s kyc object
+          kyc: {
+            pan: lead.pan || "",
+            aadhar: lead.aadhar || "",
+            files: [], // uploads continue to work as before via /customers/:id/kyc/upload
+          },
+
+          // Map addresses to line1 fields (non-destructive, keeps your structure)
+          address: {
+            permanent: { line1: lead.permanentAddress || "" },
+            correspondence: { line1: lead.currentAddress || "" },
+          },
+
+          // Keep any notes
+          logNotes: lead.notes || "",
+        });
       }
 
-      // Create case (carry forward all details)
-      const newCase = await Case.create({
-        caseId: lead.leadId,
-        leadId: lead.leadId,
-        loanType: chosenLoanType,
-        status: "Pending",
-        amount: lead.requirementAmount,
-        bank: "",
-        branch: lead.branch,
-
-        // Applicant
-        customerName: lead.name,
-        mobile: lead.mobile,
-        email: lead.email,
-
-        // Contact
-        permanentAddress: lead.permanentAddress,
-        currentAddress: lead.currentAddress,
-        siteAddress: lead.siteAddress,
-        officeAddress: lead.officeAddress,
-
-        // KYC
-        pan: lead.pan,
-        aadhar: lead.aadhar,
-
-        // Notes
-        notes: lead.notes || "",
-      });
-
-      res.json({
+      return res.json({
         message: "Lead converted successfully",
         lead,
-        case: newCase,
+        case: caseDoc,
+        customer: customerDoc,
+
+        // Also expose flat IDs for UIs that read these top-level keys
+        caseId: caseDoc.caseId,
+        customerId: customerDoc.customerId,
       });
     } catch (e) {
       next(e);

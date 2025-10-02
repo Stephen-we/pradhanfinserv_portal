@@ -105,32 +105,46 @@ export default function Users() {
         <table className="table">
           <thead>
             <tr>
-              <th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th>
+              <th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Change Role</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map(u => (
-              <tr key={u._id}>
-                <td>{u.name}</td>
-                <td>{u.email}</td>
-                <td>{u.role}</td>
-                <td>{u.isActive ? "Active" : "Disabled"}</td>
-                <td style={{display:"flex", gap:6, flexWrap:"wrap"}}>
-                  <select className="input" value={u.role} onChange={e=>setRole(u._id, e.target.value)}>
-                    <option value="superadmin">superadmin</option>
-                    <option value="admin">admin</option>
-                    <option value="manager">manager</option>
-                    <option value="officer">officer</option>
-                    <option value="viewer">viewer</option>
-                  </select>
-                  <button className="btn secondary" onClick={()=>setActive(u._id, !u.isActive)}>{u.isActive ? "Disable":"Enable"}</button>
-                  <button className="btn" onClick={()=>resetPass(u._id)}>Reset Password</button>
-                  <button className="btn" onClick={()=>setModal({ type:"edit", user:{...u} })}>Edit</button>
-                  <button className="btn danger" onClick={()=>setModal({ type:"delete", user:u })}>Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+        {items.map(u => (
+          <tr key={u._id}>
+            <td>{u.name}</td>
+            <td>{u.email}</td>
+            <td>{u.role}</td>
+            <td>{u.isActive ? "Active" : "Disabled"}</td>
+
+            {/* 👇 Role Selector in its own column */}
+            <td>
+              <select
+                className="input"
+                value={u.role}
+                onChange={e => setRole(u._id, e.target.value)}
+              >
+                <option value="superadmin">superadmin</option>
+                <option value="admin">admin</option>
+                <option value="manager">manager</option>
+                <option value="officer">officer</option>
+                <option value="viewer">viewer</option>
+              </select>
+            </td>
+
+
+            {/* 👇 Only buttons in Actions column */}
+            <td style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+              <button className="btn sm secondary" onClick={() => setActive(u._id, !u.isActive)}>
+                {u.isActive ? "Disable" : "Enable"}
+              </button>
+              <button className="btn sm" onClick={() => resetPass(u._id)}>Reset</button>
+              <button className="btn sm" onClick={() => setModal({ type:"edit", user:{...u} })}>Edit</button>
+              <button className="btn sm danger" onClick={() => setModal({ type:"delete", user:u })}>Delete</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+
         </table>
       </div>
 

@@ -58,10 +58,13 @@ export default function DataTable({
             <tr key={r._id || i}>
               {columns.map((col) => (
                 <td key={col.header}>
-                  {typeof col.accessor === "function"
-                    ? col.accessor(r, i, false) // ✅ pass exportMode = false
-                    : r[col.accessor]}
-                </td>
+              {col.cell
+                ? col.cell(r[col.accessor], r, i) // ✅ custom JSX cell
+                : typeof col.accessor === "function"
+                ? col.accessor(r, i, false)
+                : r[col.accessor]}
+            </td>
+
               ))}
             </tr>
           ))}
