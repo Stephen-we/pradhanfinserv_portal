@@ -1,4 +1,3 @@
-//server/src/models/Case.js
 import mongoose from "mongoose";
 
 const CaseSchema = new mongoose.Schema(
@@ -64,7 +63,7 @@ const CaseSchema = new mongoose.Schema(
 
     // Relations
     customer: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" },
-    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     bankBranch: { type: mongoose.Schema.Types.ObjectId, ref: "BankBranch" },
 
     // Misc

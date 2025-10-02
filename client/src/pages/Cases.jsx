@@ -13,6 +13,7 @@ export default function Cases() {
     users: [],
   });
   const [assigningId, setAssigningId] = useState(null);
+  const [localAssignments, setLocalAssignments] = useState({}); // Track local assignments
 
   // 🔹 Load cases with safe handling
   const load = async () => {
@@ -20,7 +21,6 @@ export default function Cases() {
       const { data } = await API.get("/cases", {
         params: { page: state.page, q: state.q },
       });
-      console.log("Cases API response:", data);
 
       const items = Array.isArray(data) ? data : data.items || [];
       const pages = Array.isArray(data) ? 1 : data.pages || 1;
@@ -91,31 +91,80 @@ export default function Cases() {
     );
   };
 
-  // 🔹 Assign user
+  // 🔹 FIXED: Assign user with proper state management
   const handleAssignChange = async (row, userId) => {
     try {
       setAssigningId(row._id);
-      await API.put(`/cases/${row._id}`, {
-        ...row,
-        assignedTo: userId || null,
-      });
+
+      // Store the assignment locally immediately
+      setLocalAssignments(prev => ({
+        ...prev,
+        [row._id]: userId || null
+      }));
+
+      const payload = { assignedTo: userId || null };
+      await API.put(`/cases/${row._id}`, payload);
+      
+      // After successful API call, reload to sync with server
       await load();
+      
+    } catch (error) {
+      console.error("Assignment failed:", error);
+      
+      // Remove local assignment on error
+      setLocalAssignments(prev => {
+        const newAssignments = { ...prev };
+        delete newAssignments[row._id];
+        return newAssignments;
+      });
+      
+      alert(`Assignment failed: ${error.response?.data?.message || error.message}`);
     } finally {
       setAssigningId(null);
     }
   };
 
-  // Helpers
+  // FIXED: Enhanced helper functions that check local assignments first
   const getAssignedId = (row) => {
+    // Check local assignments first (for immediate UI update)
+    if (localAssignments[row._id] !== undefined) {
+      return localAssignments[row._id] || "";
+    }
+    
+    // Then check the actual data from API
     if (!row?.assignedTo) return "";
-    return typeof row.assignedTo === "object" ? row.assignedTo._id : row.assignedTo;
+    
+    if (typeof row.assignedTo === 'object') {
+      return row.assignedTo._id || "";
+    }
+    
+    if (typeof row.assignedTo === 'string') {
+      return row.assignedTo;
+    }
+    
+    return "";
   };
 
-  const getAssignedName = (row) =>
-    row?.assignedTo?.name ||
-    row?.assignedName ||
-    state.users.find((u) => u._id === getAssignedId(row))?.name ||
-    "";
+  const getAssignedName = (row) => {
+    const assignedId = getAssignedId(row);
+    
+    // If we have a local assignment, show the user name immediately
+    if (localAssignments[row._id] && localAssignments[row._id] !== "") {
+      const user = state.users.find(u => u._id === localAssignments[row._id]);
+      return user?.name || "";
+    }
+    
+    // Otherwise use the normal logic
+    if (row?.assignedTo?.name) return row.assignedTo.name;
+    if (row?.assignedName) return row.assignedName;
+    
+    if (assignedId) {
+      const user = state.users.find((u) => u._id === assignedId);
+      return user?.name || "";
+    }
+    
+    return "";
+  };
 
   return (
     <div>
@@ -124,7 +173,6 @@ export default function Cases() {
       </header>
       <DataTable
         columns={[
-          // 🔹 Added Sr. No column
           {
             header: "Sr. No",
             accessor: (row, index, exportMode) => {
@@ -147,18 +195,24 @@ export default function Cases() {
           { header: "Mobile", accessor: "mobile" },
           { header: "Loan Type", accessor: "loanType" },
 
-          // Assigned column
+          // FIXED: Assigned column with stable local state
           {
             header: "Assigned",
             accessor: (row, index, exportMode) => {
               if (exportMode) return getAssignedName(row);
               const current = getAssignedId(row);
+              
               return (
                 <select
                   value={current}
                   disabled={assigningId === row._id}
                   onChange={(e) => handleAssignChange(row, e.target.value)}
-                  style={{ padding: 4, minWidth: 140 }}
+                  style={{ 
+                    padding: 4, 
+                    minWidth: 140,
+                    // Visual feedback for loading state
+                    opacity: assigningId === row._id ? 0.7 : 1
+                  }}
                 >
                   <option value="">Unassigned</option>
                   {state.users.map((u) => (

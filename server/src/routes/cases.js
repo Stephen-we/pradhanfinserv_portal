@@ -1,10 +1,12 @@
-// server/src/routes/cases.js
 import express from "express";
 import path from "path";
 import fs from "fs";
 import archiver from "archiver";
+import mongoose from "mongoose";
+
 import Case from "../models/Case.js";
 import CaseAudit from "../models/CaseAudit.js";
+import User from "../models/User.js";
 import { auth } from "../middleware/auth.js";
 import { listWithPagination } from "../utils/paginate.js";
 import { upload } from "../middleware/uploads.js";
@@ -12,7 +14,7 @@ import { upload } from "../middleware/uploads.js";
 const router = express.Router();
 
 //
-// ✅ List with pagination + search
+// ✅ List with pagination + search (single, enhanced version)
 //
 router.get("/", auth, async (req, res, next) => {
   try {
@@ -33,7 +35,7 @@ router.get("/", auth, async (req, res, next) => {
       Case,
       cond,
       { page, limit },
-      { path: "assignedTo", select: "name role" }
+      { path: "assignedTo", select: "name role", model: "User" }
     );
 
     res.json(data);
@@ -62,15 +64,13 @@ router.get("/:id", auth, async (req, res, next) => {
     } else if (caseObj.kycDocs && typeof caseObj.kycDocs === "object") {
       normalized = { ...caseObj.kycDocs };
     }
-
     Object.keys(normalized).forEach((k) => {
       const val = normalized[k];
       normalized[k] = Array.isArray(val) ? val : [val].filter(Boolean);
     });
-
     caseObj.kycDocs = normalized;
 
-    // Ensure new documentSections are normalized
+    // Normalize new documentSections
     if (caseObj.documentSections && Array.isArray(caseObj.documentSections)) {
       caseObj.documentSections = caseObj.documentSections.map((section) => ({
         ...section,
@@ -111,7 +111,7 @@ router.get("/:id/public", async (req, res, next) => {
     });
     caseObj.kycDocs = normalized;
 
-    // Ensure new documentSections are normalized
+    // Normalize new documentSections
     if (caseObj.documentSections && Array.isArray(caseObj.documentSections)) {
       caseObj.documentSections = caseObj.documentSections.map((section) => ({
         ...section,
@@ -131,6 +131,7 @@ router.get("/:id/public", async (req, res, next) => {
 
 //
 // ✅ Update case with support for both KYC docs and documentSections (AUTH)
+//    + persists assignedTo properly (enum-safe audit)
 //
 router.put("/:id", auth, upload.any(), async (req, res, next) => {
   try {
@@ -141,6 +142,8 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
 
     const prev = await Case.findById(req.params.id);
     if (!prev) return res.status(404).json({ message: "Case not found" });
+
+    const prevAssigned = prev.assignedTo ? String(prev.assignedTo) : null;
 
     const body = req.body || {};
     const updateData = {
@@ -170,9 +173,30 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       task: body.task,
     };
 
+    // ✅ Handle assignedTo (supports "", null → unassign; id/object → assign)
+    let resolvedAssignedTo; // undefined = not provided; null = unassign; ObjectId string = assign
+    if ("assignedTo" in body) {
+      const raw = body.assignedTo;
+
+      if (raw === "" || raw === "null" || raw == null) {
+        resolvedAssignedTo = null;
+      } else if (typeof raw === "object" && raw?._id) {
+        resolvedAssignedTo = String(raw._id);
+      } else if (mongoose.Types.ObjectId.isValid(String(raw))) {
+        const exists = await User.exists({ _id: raw });
+        if (!exists)
+          return res.status(400).json({ message: "Assigned user not found" });
+        resolvedAssignedTo = String(raw);
+      } else {
+        return res.status(400).json({ message: "Invalid assignedTo value" });
+      }
+    }
+    if (resolvedAssignedTo !== undefined) {
+      updateData.assignedTo = resolvedAssignedTo; // can be null or valid id
+    }
+
     // 🔹 Handle NEW documentSections
     let documentSections = [];
-
     try {
       let raw = body.documentSections;
       if (typeof raw === "string") {
@@ -182,45 +206,59 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       } else if (raw && typeof raw === "object") {
         documentSections = [raw];
       }
-      console.log("✅ Parsed documentSections:", documentSections?.length || 0, "sections");
+      console.log(
+        "✅ Parsed documentSections:",
+        documentSections?.length || 0,
+        "sections"
+      );
 
       if (Array.isArray(documentSections)) {
-        const processedSections = documentSections.map((section, sectionIndex) => ({
-          id: section.id || `section-${sectionIndex}-${Date.now()}`,
-          name: section.name || "Untitled Section",
-          documents: (section.documents || []).map((doc, docIndex) => ({
-            id: doc.id || `doc-${sectionIndex}-${docIndex}-${Date.now()}`,
-            name: doc.name || "Untitled Document",
-            files: [...(doc.files || [])],
-          })),
-        }));
+        const processedSections = documentSections.map(
+          (section, sectionIndex) => ({
+            id: section.id || `section-${sectionIndex}-${Date.now()}`,
+            name: section.name || "Untitled Section",
+            documents: (section.documents || []).map((doc, docIndex) => ({
+              id: doc.id || `doc-${sectionIndex}-${docIndex}-${Date.now()}`,
+              name: doc.name || "Untitled Document",
+              files: [...(doc.files || [])],
+            })),
+          })
+        );
 
         if (req.files && req.files.length > 0) {
-          const docFiles = req.files.filter((f) => f.fieldname === "documents");
-          console.log(`📁 Found ${docFiles.length} files with fieldname 'documents'`);
+          const docFiles = req.files.filter(
+            (f) => f.fieldname === "documents"
+          );
+          console.log(
+            `📁 Found ${docFiles.length} files with fieldname 'documents'`
+          );
 
           for (const file of docFiles) {
             const sectionIndex = parseInt(body.documents_sectionIndex) || 0;
             const docIndex = parseInt(body.documents_docIndex) || 0;
-            const docId = body.documents_docId || `doc-${sectionIndex}-${docIndex}-${Date.now()}`;
+            const docId =
+              body.documents_docId ||
+              `doc-${sectionIndex}-${docIndex}-${Date.now()}`;
 
             if (!processedSections[sectionIndex]) {
               processedSections[sectionIndex] = {
                 id: `section-${sectionIndex}-${Date.now()}`,
                 name: "New Section",
-                documents: []
+                documents: [],
               };
             }
             if (!processedSections[sectionIndex].documents[docIndex]) {
               processedSections[sectionIndex].documents[docIndex] = {
                 id: docId,
                 name: "New Document",
-                files: []
+                files: [],
               };
             }
 
             processedSections[sectionIndex].documents[docIndex].files.push({
-              id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: `file-${Date.now()}-${Math.random()
+                .toString(36)
+                .substr(2, 9)}`,
               name: file.originalname,
               filename: file.filename,
               type: file.mimetype,
@@ -244,11 +282,35 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       runValidators: true,
     }).populate("assignedTo", "name role");
 
+    // base audit
     await CaseAudit.create({
       case: item._id,
       actor: req.user.id,
       action: "updated",
     });
+
+    // ✅ enum-safe extra audit when assignment changed
+    const newAssigned = item.assignedTo
+      ? String(item.assignedTo._id || item.assignedTo)
+      : null;
+    if (resolvedAssignedTo !== undefined && prevAssigned !== newAssigned) {
+      // Optional: previous assignee name for better readability
+      let prevName = "Unassigned";
+      if (prevAssigned) {
+        try {
+          const prevUser = await User.findById(prevAssigned, "name").lean();
+          if (prevUser?.name) prevName = prevUser.name;
+        } catch {}
+      }
+      const newName = item.assignedTo?.name || "Unassigned";
+
+      await CaseAudit.create({
+        case: item._id,
+        actor: req.user.id,
+        action: "updated", // ✅ stay inside your enum
+        comment: `Assignment: ${prevName} → ${newName}`,
+      });
+    }
 
     console.log("✅ Case updated successfully");
     res.json(item);
@@ -301,7 +363,6 @@ router.put("/:id/public", upload.any(), async (req, res, next) => {
 
     // 🔹 Handle NEW documentSections (same as secured)
     let documentSections = [];
-
     try {
       let raw = body.documentSections;
       if (typeof raw === "string") {
@@ -311,45 +372,59 @@ router.put("/:id/public", upload.any(), async (req, res, next) => {
       } else if (raw && typeof raw === "object") {
         documentSections = [raw];
       }
-      console.log("✅ Parsed (PUBLIC) documentSections:", documentSections?.length || 0, "sections");
+      console.log(
+        "✅ Parsed (PUBLIC) documentSections:",
+        documentSections?.length || 0,
+        "sections"
+      );
 
       if (Array.isArray(documentSections)) {
-        const processedSections = documentSections.map((section, sectionIndex) => ({
-          id: section.id || `section-${sectionIndex}-${Date.now()}`,
-          name: section.name || "Untitled Section",
-          documents: (section.documents || []).map((doc, docIndex) => ({
-            id: doc.id || `doc-${sectionIndex}-${docIndex}-${Date.now()}`,
-            name: doc.name || "Untitled Document",
-            files: [...(doc.files || [])],
-          })),
-        }));
+        const processedSections = documentSections.map(
+          (section, sectionIndex) => ({
+            id: section.id || `section-${sectionIndex}-${Date.now()}`,
+            name: section.name || "Untitled Section",
+            documents: (section.documents || []).map((doc, docIndex) => ({
+              id: doc.id || `doc-${sectionIndex}-${docIndex}-${Date.now()}`,
+              name: doc.name || "Untitled Document",
+              files: [...(doc.files || [])],
+            })),
+          })
+        );
 
         if (req.files && req.files.length > 0) {
-          const docFiles = req.files.filter((f) => f.fieldname === "documents");
-          console.log(`📁 (PUBLIC) Found ${docFiles.length} files with fieldname 'documents'`);
+          const docFiles = req.files.filter(
+            (f) => f.fieldname === "documents"
+          );
+          console.log(
+            `📁 (PUBLIC) Found ${docFiles.length} files with fieldname 'documents'`
+          );
 
           for (const file of docFiles) {
             const sectionIndex = parseInt(body.documents_sectionIndex) || 0;
             const docIndex = parseInt(body.documents_docIndex) || 0;
-            const docId = body.documents_docId || `doc-${sectionIndex}-${docIndex}-${Date.now()}`;
+            const docId =
+              body.documents_docId ||
+              `doc-${sectionIndex}-${docIndex}-${Date.now()}`;
 
             if (!processedSections[sectionIndex]) {
               processedSections[sectionIndex] = {
                 id: `section-${sectionIndex}-${Date.now()}`,
                 name: "New Section",
-                documents: []
+                documents: [],
               };
             }
             if (!processedSections[sectionIndex].documents[docIndex]) {
               processedSections[sectionIndex].documents[docIndex] = {
                 id: docId,
                 name: "New Document",
-                files: []
+                files: [],
               };
             }
 
             processedSections[sectionIndex].documents[docIndex].files.push({
-              id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: `file-${Date.now()}-${Math.random()
+                .toString(36)
+                .substr(2, 9)}`,
               name: file.originalname,
               filename: file.filename,
               type: file.mimetype,
@@ -484,7 +559,4 @@ router.get("/:id/download", auth, async (req, res, next) => {
   }
 });
 
-//
-// ✅ Export properly for ESM
-//
 export default router;
