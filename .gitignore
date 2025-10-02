@@ -78,3 +78,8 @@ Thumbs.db
 # DynamoDB Local files
 .dynamodb/
 server/server/uploads/
+server/src/uploads/
+*.jpeg
+*.jpg
+*.png
+*.pdf
