@@ -11,30 +11,49 @@ import {
   FiLogIn,
   FiMenu,
   FiChevronDown,
-  FiChevronRight
+  FiChevronRight,
 } from "react-icons/fi";
 import logo from "../assets/logo.png";
 import "../styles/Sidebar.css";
 
-export default function Sidebar() {
+export default function Sidebar({ isMobile, open, setOpen }) {
   const [collapsed, setCollapsed] = useState(false);
   const [openLeads, setOpenLeads] = useState(false);
   const isAuthed = !!localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
+  // Manual toggle (three dots button)
+  const toggleCollapse = () => setCollapsed(!collapsed);
+
+  // Auto expand/collapse on hover
+  const handleMouseEnter = () => {
+    if (collapsed) setCollapsed(false); // expand on hover
+  };
+  const handleMouseLeave = () => {
+    if (!collapsed) setCollapsed(true); // collapse when leaving
+  };
+
   return (
-    <div className={`sidebar ${collapsed ? "collapsed" : ""}`}>
-      {/* Toggle button */}
-      <button className="toggle-btn" onClick={() => setCollapsed(!collapsed)}>
-        <FiMenu />
-      </button>
+    <div
+      className={`sidebar ${collapsed ? "collapsed" : ""} ${
+        isMobile && !open ? "mobile-hidden" : ""
+      }`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Toggle button (desktop collapse) */}
+      {!isMobile && (
+        <button className="toggle-btn" onClick={toggleCollapse}>
+          <FiMenu />
+        </button>
+      )}
 
       {/* Logo */}
       <div className="logo-container">
         <img src={logo} alt="Logo" className="sidebar-logo" />
       </div>
 
-      {/* Nav Links - REMOVED UserProfile from here */}
+      {/* Navigation */}
       <nav className="nav">
         {isAuthed ? (
           <>
@@ -43,7 +62,7 @@ export default function Sidebar() {
               <span>Dashboard</span>
             </NavLink>
 
-            {/* Leads with submenu */}
+            {/* Leads submenu */}
             <div className="submenu">
               <button
                 className="submenu-btn"
@@ -89,7 +108,6 @@ export default function Sidebar() {
               <span>Bank Branch</span>
             </NavLink>
 
-            {/* Only admin & superadmin see User Management */}
             {(user.role === "admin" || user.role === "superadmin") && (
               <NavLink to="/users">
                 <FiShield />

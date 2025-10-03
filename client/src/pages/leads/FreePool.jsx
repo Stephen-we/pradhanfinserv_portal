@@ -1,10 +1,12 @@
 // client/src/pages/leads/FreePool.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../services/api";
 import DataTable from "../../components/DataTable";
+import "../../styles/DataTable.css";
+import { FiTrash2 } from "react-icons/fi";
 
-// ✅ Precise Aging Helper
+// ✅ Compact Aging Helper
 function timeAgo(date) {
   if (!date) return "-";
   const now = new Date();
@@ -17,33 +19,19 @@ function timeAgo(date) {
   const day = Math.floor(hr / 24);
 
   if (sec < 5) return "just now";
-  if (sec < 60) return `${sec} sec${sec > 1 ? "s" : ""} ago`;
-  if (min < 60) return `${min} min${min > 1 ? "s" : ""} ago`;
-  if (hr < 24) {
-    const remainMin = min % 60;
-    return remainMin > 0
-      ? `${hr} hr${hr > 1 ? "s" : ""} ${remainMin} min ago`
-      : `${hr} hr${hr > 1 ? "s" : ""} ago`;
-  }
-  if (day === 1) {
-    return `Yesterday at ${past.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-  }
-  if (day < 30) return `${day} day${day > 1 ? "s" : ""} ago`;
-  if (day < 365)
-    return `${Math.floor(day / 30)} month${
-      Math.floor(day / 30) > 1 ? "s" : ""
-    } ago`;
-  return `${Math.floor(day / 365)} year${
-    Math.floor(day / 365) > 1 ? "s" : ""
-  } ago`;
+  if (sec < 60) return `${sec}s ago`;
+  if (min < 60) return `${min}m ago`;
+  if (hr < 24) return `${hr}h ago`;
+  if (day === 1) return "1 day ago";
+  if (day < 30) return `${day}d ago`;
+  if (day < 365) return `${Math.floor(day / 30)}mo ago`;
+  return `${Math.floor(day / 365)}y ago`;
 }
 
 function FreePool() {
   const navigate = useNavigate();
   const [state, setState] = useState({ items: [], page: 1, pages: 1, q: "" });
+  const [filters, setFilters] = useState({ leadType: "", subType: "" });
   const role = JSON.parse(localStorage.getItem("user") || "{}").role || "";
 
   const load = () => {
@@ -51,7 +39,6 @@ function FreePool() {
       params: { page: state.page, q: state.q, status: "free_pool" },
     })
       .then((r) => {
-        // ✅ Adjust for pagination response
         const leads = r.data.docs || r.data.items || r.data || [];
         const sorted = leads.sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -79,6 +66,28 @@ function FreePool() {
     }
   };
 
+  // ✅ Apply filters dynamically
+  const filteredItems = useMemo(() => {
+    return state.items.filter((lead) => {
+      const typeMatch = filters.leadType
+        ? lead.leadType === filters.leadType
+        : true;
+      const subMatch = filters.subType
+        ? lead.subType === filters.subType
+        : true;
+      return typeMatch && subMatch;
+    });
+  }, [state.items, filters]);
+
+  // ✅ Collect unique options for dropdowns
+  const leadTypes = [...new Set(state.items.map((l) => l.leadType).filter(Boolean))];
+  const subTypes = [...new Set(
+    state.items
+      .filter((l) => !filters.leadType || l.leadType === filters.leadType)
+      .map((l) => l.subType)
+      .filter(Boolean)
+  )];
+
   return (
     <div>
       <header
@@ -86,6 +95,7 @@ function FreePool() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          marginBottom: "20px",
         }}
       >
         <h1>Free Pool Leads</h1>
@@ -94,20 +104,83 @@ function FreePool() {
         </button>
       </header>
 
+      {/* ✅ Filters Section */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+        <select
+          value={filters.leadType}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, leadType: e.target.value, subType: "" }))
+          }
+        >
+          <option value="">All Lead Types</option>
+          {leadTypes.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filters.subType}
+          onChange={(e) => setFilters((f) => ({ ...f, subType: e.target.value }))}
+        >
+          <option value="">All Sub Types</option>
+          {subTypes.map((st) => (
+            <option key={st} value={st}>
+              {st}
+            </option>
+          ))}
+        </select>
+
+        {(filters.leadType || filters.subType) && (
+          <button
+            className="btn"
+            style={{ background: "#e5e7eb", color: "#111" }}
+            onClick={() => setFilters({ leadType: "", subType: "" })}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
       <DataTable
         columns={[
           {
             header: "Sr.No.",
-            accessor: (row, i) => (state.page - 1) * 10 + i + 1,
+            accessor: (row, i) => (
+              <div style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                {i + 1}
+              </div>
+            ),
+            className: "col-center",
           },
           {
             header: "Date",
-            accessor: (row) =>
-              row.createdAt
-                ? new Date(row.createdAt).toLocaleDateString()
-                : "-",
+            accessor: (row) => (
+              <div style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                {row.createdAt
+                  ? new Date(row.createdAt).toLocaleDateString()
+                  : "-"}
+              </div>
+            ),
+            className: "col-center",
           },
-          { header: "Aging", accessor: (row) => timeAgo(row.createdAt) },
+          {
+            header: "Aging",
+            accessor: (row) => (
+              <div
+                style={{
+                  whiteSpace: "nowrap",
+                  textAlign: "center",
+                  lineHeight: "1.2",
+                  padding: "4px 0",
+                }}
+              >
+                {timeAgo(row.createdAt)}
+              </div>
+            ),
+            className: "col-center",
+          },
           {
             header: "Lead ID",
             accessor: (row, i, exportMode) =>
@@ -122,35 +195,139 @@ function FreePool() {
                     display: "flex",
                     alignItems: "center",
                     height: "100%",
+                    whiteSpace: "nowrap",
+                    justifyContent: "center",
+                    padding: "4px 0",
                   }}
-                  onClick={() => navigate(`/leads/view/${row._id}`)} // ✅ fixed
+                  onClick={() => navigate(`/leads/view/${row._id}`)}
                 >
                   {row.leadId}
                 </span>
               ),
+            className: "col-center",
           },
-          { header: "Customer Name", accessor: "name" },
-          { header: "Mobile", accessor: "mobile" },
-          { header: "Email", accessor: "email" },
-          { header: "Lead Type", accessor: "leadType" },
-          { header: "Status", accessor: "status" },
           {
-            header: "Actions",
+            header: "Customer Name",
             accessor: (row) => (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {(role === "admin" || role === "superadmin") && (
-                  <button
-                    className="btn danger"
-                    onClick={() => deleteLead(row._id)}
-                  >
-                    Delete
-                  </button>
-                )}
+              <div style={{ whiteSpace: "nowrap", padding: "4px 0" }}>
+                {row.name}
               </div>
             ),
           },
+          {
+            header: "Mobile",
+            accessor: (row) => (
+              <div
+                style={{
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  padding: "4px 0",
+                }}
+              >
+                {row.mobile}
+              </div>
+            ),
+            className: "col-center",
+          },
+          {
+            header: "Email",
+            accessor: (row) => (
+              <div style={{ whiteSpace: "nowrap", padding: "4px 0" }}>
+                {row.email}
+              </div>
+            ),
+          },
+          {
+            header: "Lead Type",
+            accessor: (row) => (
+              <div
+                style={{
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  padding: "4px 0",
+                }}
+              >
+                {row.leadType}
+              </div>
+            ),
+            className: "col-center",
+          },
+          {
+            header: "Sub Type",
+            accessor: (row) => (
+              <div
+                style={{
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  padding: "4px 0",
+                }}
+              >
+                {row.subType || "N/A"}
+              </div>
+            ),
+            className: "col-center",
+          },
+          {
+            header: "Date of Birth",
+            accessor: (row) => (
+              <div
+                style={{
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  padding: "4px 0",
+                }}
+              >
+                {row.dob
+                  ? new Date(row.dob).toLocaleDateString("en-IN")
+                  : "N/A"}
+              </div>
+            ),
+            className: "col-center",
+          },
+          {
+            header: "Status",
+            accessor: (row) => (
+              <div
+                style={{
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  padding: "4px 0",
+                }}
+              >
+                {row.status}
+              </div>
+            ),
+            className: "col-center",
+          },
+          {
+            header: "Actions",
+            accessor: (row) => (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  padding: "4px 0",
+                }}
+              >
+                {(role === "admin" || role === "superadmin") && (
+                  <FiTrash2
+                    style={{
+                      cursor: "pointer",
+                      color: "#dc2626",
+                      fontSize: "1.2em",
+                    }}
+                    title="Delete Lead"
+                    onClick={() => deleteLead(row._id)}
+                  />
+                )}
+              </div>
+            ),
+            className: "col-center",
+            style: { width: "50px" },
+          },
         ]}
-        rows={state.items}
+        rows={filteredItems}
         page={state.page}
         pages={state.pages}
         onPage={(p) => setState((s) => ({ ...s, page: p }))}

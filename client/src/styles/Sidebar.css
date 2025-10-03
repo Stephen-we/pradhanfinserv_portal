@@ -1,6 +1,7 @@
+/* ===== Sidebar Base ===== */
 .sidebar {
-  width: 240px;
-  background-color: #2f3c7e;
+  width: 260px;
+  background: var(--sidebar);
   color: #fff;
   height: 100vh;
   position: fixed;
@@ -8,16 +9,23 @@
   left: 0;
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, transform 0.3s ease;
   z-index: 1000;
   overflow-y: auto;
 }
 
+/* Collapsed Sidebar */
 .sidebar.collapsed {
   width: 70px;
 }
 
-.sidebar .toggle-btn {
+/* Hidden Sidebar on Mobile */
+.sidebar.mobile-hidden {
+  transform: translateX(-100%);
+}
+
+/* ===== Toggle Button ===== */
+.toggle-btn {
   background: none;
   border: none;
   color: #fff;
@@ -28,7 +36,12 @@
   width: 100%;
 }
 
-.sidebar .logo-container {
+.sidebar.collapsed .toggle-btn {
+  text-align: center;
+}
+
+/* ===== Logo ===== */
+.logo-container {
   text-align: center;
   padding: 15px 0;
   border-bottom: 1px solid #3f4c9d;
@@ -45,14 +58,15 @@
   width: 0;
 }
 
-.sidebar .nav {
+/* ===== Navigation ===== */
+.nav {
   display: flex;
   flex-direction: column;
   padding: 10px;
   flex: 1;
 }
 
-.sidebar .nav a {
+.nav a {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -66,22 +80,23 @@
   white-space: nowrap;
 }
 
-.sidebar .nav a:hover {
+.nav a:hover {
   background-color: #3f4c9d;
   color: #fff;
 }
 
-.sidebar .nav a.active {
+.nav a.active {
   background-color: #4752c4;
   color: #fff;
   font-weight: 500;
 }
 
+/* Hide labels in collapsed mode */
 .sidebar.collapsed .nav a span {
   display: none;
 }
 
-/* Submenu Styles */
+/* ===== Submenu ===== */
 .submenu {
   margin-bottom: 5px;
 }
@@ -108,11 +123,6 @@
   color: #fff;
 }
 
-.submenu-btn:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-
 .submenu-content {
   display: flex;
   align-items: center;
@@ -123,7 +133,6 @@
 .chevron {
   transition: transform 0.3s ease;
 }
-
 .rotate {
   transform: rotate(180deg);
 }
@@ -141,13 +150,14 @@
   margin-bottom: 3px;
 }
 
-/* Hide submenu elements when collapsed */
+/* Hide submenu in collapsed */
 .sidebar.collapsed .submenu-btn span,
 .sidebar.collapsed .chevron,
 .sidebar.collapsed .submenu-links {
   display: none;
 }
 
+/* Center submenu icon when collapsed */
 .sidebar.collapsed .submenu-btn {
   justify-content: center;
 }
@@ -156,27 +166,19 @@
   justify-content: center;
 }
 
-/* Add this to your existing Sidebar.css */
-.sidebar-user-profile {
-  padding: 15px;
-  border-bottom: 1px solid #3f4c9d;
-  margin-bottom: 10px;
-}
-
-/* Ensure the user profile adapts to collapsed state */
-.sidebar.collapsed .sidebar-user-profile {
-  padding: 10px;
-}
-
-.sidebar.collapsed .user-name {
-  display: none;
-}
-
-.sidebar.collapsed .dropdown-arrow {
-  display: none;
-}
-
-.sidebar.collapsed .profile-trigger {
-  justify-content: center;
-  padding: 8px;
+/* ===== Responsive ===== */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transform: translateX(0);
+  }
+  .sidebar.mobile-hidden {
+    transform: translateX(-100%);
+  }
+  .toggle-btn {
+    text-align: center;
+  }
 }

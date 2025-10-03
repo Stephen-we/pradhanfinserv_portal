@@ -104,6 +104,20 @@ export default function ViewLead() {
     setNotes(e.target.value);
   };
 
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      return new Date(dateString).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
   if (loading) return <div className="card">Loading...</div>;
   if (!lead) return <div className="card">Lead not found</div>;
 
@@ -154,6 +168,10 @@ export default function ViewLead() {
                       <div className="summary-item">
                         <label>Mobile:</label>
                         <span>{lead.mobile}</span>
+                      </div>
+                      <div className="summary-item">
+                        <label>Date of Birth:</label>
+                        <span>{formatDate(lead.dob)}</span>
                       </div>
                       <div className="summary-item">
                         <label>Lead ID:</label>
@@ -302,6 +320,10 @@ export default function ViewLead() {
             <div className="detail-item">
               <label>Email:</label>
               <span>{lead.email || "N/A"}</span>
+            </div>
+            <div className="detail-item">
+              <label>Date of Birth:</label>
+              <span>{formatDate(lead.dob)}</span>
             </div>
             <div className="detail-item">
               <label>Source:</label>

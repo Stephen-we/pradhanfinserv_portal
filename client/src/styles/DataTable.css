@@ -1,0 +1,95 @@
+/* Add to your DataTable.css */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Arial, sans-serif;
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e1e1e1;
+  vertical-align: middle !important;
+}
+
+.data-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table tr:hover {
+  background-color: #f5f5f5;
+}
+
+/* Center aligned columns */
+.col-center {
+  text-align: center !important;
+}
+
+.col-center > div {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* Ensure consistent row heights */
+.data-table tbody tr {
+  height: 50px; /* Fixed row height */
+}
+
+.data-table td > div {
+  display: flex;
+  align-items: center;
+  min-height: 100%;
+}
+
+/* Compact styling for better alignment */
+.compact-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 4px 8px;
+  line-height: 1.2;
+}
+
+/* Button styling */
+.btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.btn.danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn.danger:hover {
+  background-color: #c82333;
+}
+
+/* Link styling */
+.col-link span {
+  font-weight: 500;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .data-table {
+    font-size: 0.9em;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 6px 8px;
+  }
+}

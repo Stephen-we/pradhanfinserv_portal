@@ -7,8 +7,9 @@ const empty = {
   name: "",
   mobile: "",
   email: "",
+  dob: "", // ✅ Added DOB
   source: "",
-  leadType: "Loan",
+  leadType: "",
   subType: "",
   requirementAmount: "",
   sanctionedAmount: "",
@@ -39,6 +40,33 @@ export default function LeadForm() {
   const [partnersError, setPartnersError] = useState(null);
   const isEdit = Boolean(id);
 
+  // ✅ Lead Type Categories
+  const leadTypeOptions = [
+    "Business Loan",
+    "Construction Loan",
+    "Education Loan",
+    "Insurance",
+    "Real Estate",
+  ];
+
+  // ✅ Sub Type Options by Category
+  const subTypeOptions = {
+    "Business Loan": [
+      "Home Loan",
+      "Resale Home Loan",
+      "Take Over + Top Up",
+      "Take Over Loan",
+      "MSME Loan",
+    ],
+    "Construction Loan": [
+      "LAP (Loan Against Property)",
+      "Plot + Construction Loan",
+    ],
+    "Education Loan": ["Personal Loan", "Vehicle Loan"],
+    Insurance: ["Life Insurance", "Health Insurance", "Vehicle Insurance"],
+    "Real Estate": ["Residential", "Commercial", "Plot Purchase"],
+  };
+
   // ✅ Fetch all distinct banks
   useEffect(() => {
     API.get("/branches/banks/distinct")
@@ -46,14 +74,12 @@ export default function LeadForm() {
       .catch(() => console.error("Failed to load banks"));
   }, []);
 
-  // ✅ Fetch channel partners (normalize response for items/docs/array)
+  // ✅ Fetch channel partners
   useEffect(() => {
     const fetchChannelPartners = async () => {
       try {
         setPartnersError(null);
         const { data } = await API.get("/channel-partners");
-
-        console.log("🔎 Channel Partners API response:", data);
 
         let partners = [];
         if (Array.isArray(data)) {
@@ -61,7 +87,7 @@ export default function LeadForm() {
         } else if (data && Array.isArray(data.docs)) {
           partners = data.docs;
         } else if (data && Array.isArray(data.items)) {
-          partners = data.items; // ✅ matches your backend
+          partners = data.items;
         }
 
         if (partners.length > 0) {
@@ -73,7 +99,9 @@ export default function LeadForm() {
       } catch (error) {
         console.error("Failed to load channel partners:", error);
         setChannelPartners([]);
-        setPartnersError("Failed to load channel partners. The feature may not be available.");
+        setPartnersError(
+          "Failed to load channel partners. The feature may not be available."
+        );
       }
     };
 
@@ -115,6 +143,7 @@ export default function LeadForm() {
           officeAddress: data.officeAddress || "",
           pan: data.pan || "",
           aadhar: data.aadhar || "",
+          dob: data.dob ? data.dob.slice(0, 10) : "", // ✅ Format date for input
         };
 
         setForm(leadData);
@@ -135,6 +164,7 @@ export default function LeadForm() {
     try {
       const payload = {
         ...form,
+        dob: form.dob ? new Date(form.dob) : null, // ✅ Send as Date
         requirementAmount:
           form.requirementAmount === "" ? null : Number(form.requirementAmount),
         sanctionedAmount:
@@ -216,6 +246,14 @@ export default function LeadForm() {
           title="Mobile number must be exactly 10 digits"
         />
 
+        {/* ✅ Date of Birth */}
+        <input
+          className="input"
+          type="date"
+          value={form.dob}
+          onChange={(e) => handleInputChange("dob", e.target.value)}
+        />
+
         {/* Email */}
         <input
           className="input"
@@ -237,7 +275,7 @@ export default function LeadForm() {
           <option value="Non-Business">Non-Business</option>
         </select>
 
-        {/* ✅ Channel Partner Dropdown */}
+        {/* Channel Partner */}
         <select
           className="input"
           value={form.channelPartner}
@@ -251,13 +289,70 @@ export default function LeadForm() {
             channelPartners.map((partner) => (
               <option key={partner._id} value={partner._id}>
                 {partner.partnerId} - {partner.name}
-                </option>
-
+              </option>
             ))
           )}
         </select>
 
-        {/* ✅ Bank Selection */}
+        {/* Lead Type */}
+        <select
+          className="input"
+          value={form.leadType}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              leadType: e.target.value,
+              subType: "",
+            }))
+          }
+        >
+          <option value="">-- Select Lead Type --</option>
+          {leadTypeOptions.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+
+        {/* Sub Type */}
+        <select
+          className="input"
+          value={form.subType}
+          onChange={(e) => handleInputChange("subType", e.target.value)}
+          disabled={!form.leadType}
+        >
+          <option value="">-- Select Sub Type --</option>
+          {form.leadType &&
+            subTypeOptions[form.leadType]?.map((sub) => (
+              <option key={sub} value={sub}>
+                {sub}
+              </option>
+            ))}
+        </select>
+
+        {/* Requirement Amount */}
+        <input
+          className="input"
+          placeholder="Requirement Amount"
+          type="number"
+          value={form.requirementAmount}
+          onChange={(e) =>
+            handleInputChange("requirementAmount", e.target.value)
+          }
+        />
+
+        {/* Sanctioned Amount */}
+        <input
+          className="input"
+          placeholder="Sanctioned Amount"
+          type="number"
+          value={form.sanctionedAmount}
+          onChange={(e) =>
+            handleInputChange("sanctionedAmount", e.target.value)
+          }
+        />
+
+        {/* Bank */}
         <select
           className="input"
           value={form.bank}
@@ -271,7 +366,7 @@ export default function LeadForm() {
           ))}
         </select>
 
-        {/* ✅ Branch Selection */}
+        {/* Branch */}
         <select
           className="input"
           value={form.branch}
@@ -289,43 +384,6 @@ export default function LeadForm() {
             ))
           )}
         </select>
-
-        {/* Lead Type */}
-        <select
-          className="input"
-          value={form.leadType}
-          onChange={(e) => handleInputChange("leadType", e.target.value)}
-        >
-          <option value="Loan">Loan</option>
-          <option value="Insurance">Insurance</option>
-          <option value="Real Estate">Real Estate</option>
-        </select>
-
-        {/* Sub Type */}
-        <input
-          className="input"
-          placeholder="Sub Type"
-          value={form.subType}
-          onChange={(e) => handleInputChange("subType", e.target.value)}
-        />
-
-        {/* Requirement Amount */}
-        <input
-          className="input"
-          placeholder="Requirement Amount"
-          type="number"
-          value={form.requirementAmount}
-          onChange={(e) => handleInputChange("requirementAmount", e.target.value)}
-        />
-
-        {/* Sanctioned Amount */}
-        <input
-          className="input"
-          placeholder="Sanctioned Amount"
-          type="number"
-          value={form.sanctionedAmount}
-          onChange={(e) => handleInputChange("sanctionedAmount", e.target.value)}
-        />
 
         {/* GD Status */}
         <select
@@ -376,7 +434,9 @@ export default function LeadForm() {
           placeholder="Permanent Address"
           style={{ gridColumn: "1 / -1", minHeight: 60 }}
           value={form.permanentAddress}
-          onChange={(e) => handleInputChange("permanentAddress", e.target.value)}
+          onChange={(e) =>
+            handleInputChange("permanentAddress", e.target.value)
+          }
         />
 
         {/* Current Address */}

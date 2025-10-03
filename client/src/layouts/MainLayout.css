@@ -1,51 +1,107 @@
+/* client/src/layouts/Mainlayout.css */
+:root {
+  --sidebar: #22314c;
+  --sidebar-accent: #1a2540;
+  --primary: #3b82f6;
+  --text: #0f172a;
+  --muted: #64748b;
+  --table-head: #2b3f66;
+}
+
+/* Reset */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: Inter, system-ui, Arial, sans-serif;
+  background: #f6f7fb;
+  color: var(--text);
+}
+
+/* App wrapper */
 .app {
   display: flex;
   min-height: 100vh;
+  background: #f6f7fb;
 }
 
+/* Content area */
 .content {
   flex: 1;
-  margin-left: 240px; /* Sidebar width */
+  padding: 22px 26px;
   transition: margin-left 0.3s ease;
-  display: flex;
-  flex-direction: column;
 }
 
-/* When sidebar is collapsed */
-.sidebar.collapsed ~ .content {
-  margin-left: 70px;
-}
-
-/* Header styles */
+/* ===== Header ===== */
 .main-header {
-  background: white;
-  padding: 1rem 2rem;
-  border-bottom: 1px solid #e0e0e0;
   display: flex;
-  justify-content: space-between; /* Space between company name and user profile */
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 14px 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
+.company-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .company-name h2 {
-  color: #2f3c7e;
-  font-size: 1.5rem;
-  font-weight: 600;
   margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--sidebar);
 }
 
 .header-content {
   display: flex;
   align-items: center;
+  gap: 16px;
 }
 
-/* Main content area */
-main {
-  flex: 1;
-  padding: 2rem;
-  background: #f8f9fa;
-  overflow-y: auto;
+/* Mobile toggle button */
+.toggle-btn-mobile {
+  background: var(--primary);
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+
+/* ===== Desktop Sidebar + Content Alignment ===== */
+@media (min-width: 1024px) {
+  .content {
+    margin-left: 260px; /* matches default sidebar width */
+  }
+  .sidebar.collapsed ~ .content {
+    margin-left: 70px;
+  }
+}
+
+/* ===== Tablet ===== */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .content {
+    margin-left: 200px; /* slightly smaller sidebar */
+  }
+  .sidebar.collapsed ~ .content {
+    margin-left: 70px;
+  }
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 767px) {
+  .content {
+    margin-left: 0; /* sidebar overlays, so content takes full width */
+    padding: 16px;
+  }
+  .company-name h2 {
+    font-size: 18px;
+  }
 }
