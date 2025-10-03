@@ -10,14 +10,12 @@ const LeadSchema = new mongoose.Schema(
     email: String,
     dob: Date,
 
-
     // Meta
     source: String,
 
     // Business
     leadId: { type: String, unique: true },
 
-    // ✅ Expanded leadType categories
     leadType: { 
       type: String, 
       enum: [
@@ -30,7 +28,6 @@ const LeadSchema = new mongoose.Schema(
       required: true 
     },
 
-    // ✅ Free text (or dropdown in UI) for subTypes
     subType: { type: String },
 
     // GD Status
@@ -40,45 +37,52 @@ const LeadSchema = new mongoose.Schema(
       default: "Pending" 
     },
 
-    // Bank + Branch
     bank: String,
     branch: String,
 
-    // ✅ Channel Partner reference
     channelPartner: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "ChannelPartner" 
     },
 
-    // Loan details
     requirementAmount: Number,
     sanctionedAmount: Number,
 
-    // Status
+    // ✅ System status for flow
     status: { 
       type: String, 
-      enum: ["free_pool", "assigned", "archived", "deleted"], 
+      enum: ["free_pool", "assigned", "archived", "deleted", "Pending", "Postpone"], 
       default: "free_pool" 
+    },
+
+    workflowStatus: {
+      type: String,
+      enum: ["FreePool", "Postpone"],
+      default: "FreePool",
+    },
+
+    // ✅ New archived-specific status
+    archivedStatus: { 
+      type: String, 
+      enum: ["", "In Progress", "Postpone"], 
+      default: "" 
     },
 
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-    // Address fields
     permanentAddress: String,
     currentAddress: String,
     siteAddress: String,
     officeAddress: String,
 
-    // IDs
     pan: String,
     aadhar: String,
-
     notes: String,
   },
   { timestamps: true }
 );
 
-// ✅ Sequential ID (LEAD-000001, LEAD-000002, ...)
+// Sequential ID (LEAD-000001, LEAD-000002, ...)
 LeadSchema.pre("save", async function (next) {
   if (!this.leadId) {
     const counter = await Counter.findOneAndUpdate(

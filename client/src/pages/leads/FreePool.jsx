@@ -31,7 +31,11 @@ function timeAgo(date) {
 function FreePool() {
   const navigate = useNavigate();
   const [state, setState] = useState({ items: [], page: 1, pages: 1, q: "" });
-  const [filters, setFilters] = useState({ leadType: "", subType: "" });
+  const [filters, setFilters] = useState({
+    leadType: "",
+    subType: "",
+    workflowStatus: "",
+  });
   const role = JSON.parse(localStorage.getItem("user") || "{}").role || "";
 
   const load = () => {
@@ -66,27 +70,59 @@ function FreePool() {
     }
   };
 
+  const updateWorkflow = async (id, newStatus) => {
+    try {
+      await API.patch(`/leads/${id}`, { workflowStatus: newStatus });
+      load();
+    } catch {
+      alert("Error updating workflow status");
+    }
+  };
+
   // ✅ Apply filters dynamically
   const filteredItems = useMemo(() => {
-    return state.items.filter((lead) => {
-      const typeMatch = filters.leadType
-        ? lead.leadType === filters.leadType
-        : true;
-      const subMatch = filters.subType
-        ? lead.subType === filters.subType
-        : true;
-      return typeMatch && subMatch;
+    let items = state.items;
+
+    // filter by leadType
+    if (filters.leadType) {
+      items = items.filter((l) => l.leadType === filters.leadType);
+    }
+
+    // filter by subType
+    if (filters.subType) {
+      items = items.filter((l) => l.subType === filters.subType);
+    }
+
+    // filter by workflowStatus
+    if (filters.workflowStatus) {
+      items = items.filter((l) => l.workflowStatus === filters.workflowStatus);
+    }
+
+    // ✅ keep Postpone at bottom
+    items = [...items].sort((a, b) => {
+      if (a.workflowStatus === "Postpone" && b.workflowStatus !== "Postpone")
+        return 1;
+      if (a.workflowStatus !== "Postpone" && b.workflowStatus === "Postpone")
+        return -1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
     });
+
+    return items;
   }, [state.items, filters]);
 
   // ✅ Collect unique options for dropdowns
-  const leadTypes = [...new Set(state.items.map((l) => l.leadType).filter(Boolean))];
-  const subTypes = [...new Set(
-    state.items
-      .filter((l) => !filters.leadType || l.leadType === filters.leadType)
-      .map((l) => l.subType)
-      .filter(Boolean)
-  )];
+  const leadTypes = [
+    ...new Set(state.items.map((l) => l.leadType).filter(Boolean)),
+  ];
+  const subTypes = [
+    ...new Set(
+      state.items
+        .filter((l) => !filters.leadType || l.leadType === filters.leadType)
+        .map((l) => l.subType)
+        .filter(Boolean)
+    ),
+  ];
+  const workflowStatuses = ["FreePool", "Postpone"];
 
   return (
     <div>
@@ -105,7 +141,9 @@ function FreePool() {
       </header>
 
       {/* ✅ Filters Section */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+      <div
+        style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}
+      >
         <select
           value={filters.leadType}
           onChange={(e) =>
@@ -122,7 +160,9 @@ function FreePool() {
 
         <select
           value={filters.subType}
-          onChange={(e) => setFilters((f) => ({ ...f, subType: e.target.value }))}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, subType: e.target.value }))
+          }
         >
           <option value="">All Sub Types</option>
           {subTypes.map((st) => (
@@ -132,11 +172,27 @@ function FreePool() {
           ))}
         </select>
 
-        {(filters.leadType || filters.subType) && (
+        <select
+          value={filters.workflowStatus}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, workflowStatus: e.target.value }))
+          }
+        >
+          <option value="">All Status</option>
+          {workflowStatuses.map((ws) => (
+            <option key={ws} value={ws}>
+              {ws}
+            </option>
+          ))}
+        </select>
+
+        {(filters.leadType || filters.subType || filters.workflowStatus) && (
           <button
             className="btn"
             style={{ background: "#e5e7eb", color: "#111" }}
-            onClick={() => setFilters({ leadType: "", subType: "" })}
+            onClick={() =>
+              setFilters({ leadType: "", subType: "", workflowStatus: "" })
+            }
           >
             Reset
           </button>
@@ -148,36 +204,7 @@ function FreePool() {
           {
             header: "Sr.No.",
             accessor: (row, i) => (
-              <div style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                {i + 1}
-              </div>
-            ),
-            className: "col-center",
-          },
-          {
-            header: "Date",
-            accessor: (row) => (
-              <div style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                {row.createdAt
-                  ? new Date(row.createdAt).toLocaleDateString()
-                  : "-"}
-              </div>
-            ),
-            className: "col-center",
-          },
-          {
-            header: "Aging",
-            accessor: (row) => (
-              <div
-                style={{
-                  whiteSpace: "nowrap",
-                  textAlign: "center",
-                  lineHeight: "1.2",
-                  padding: "4px 0",
-                }}
-              >
-                {timeAgo(row.createdAt)}
-              </div>
+              <div style={{ textAlign: "center" }}>{i + 1}</div>
             ),
             className: "col-center",
           },
@@ -192,12 +219,6 @@ function FreePool() {
                     color: "#2563eb",
                     cursor: "pointer",
                     textDecoration: "underline",
-                    display: "flex",
-                    alignItems: "center",
-                    height: "100%",
-                    whiteSpace: "nowrap",
-                    justifyContent: "center",
-                    padding: "4px 0",
                   }}
                   onClick={() => navigate(`/leads/view/${row._id}`)}
                 >
@@ -206,96 +227,27 @@ function FreePool() {
               ),
             className: "col-center",
           },
-          {
-            header: "Customer Name",
-            accessor: (row) => (
-              <div style={{ whiteSpace: "nowrap", padding: "4px 0" }}>
-                {row.name}
-              </div>
-            ),
-          },
-          {
-            header: "Mobile",
-            accessor: (row) => (
-              <div
-                style={{
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                  padding: "4px 0",
-                }}
-              >
-                {row.mobile}
-              </div>
-            ),
-            className: "col-center",
-          },
-          {
-            header: "Email",
-            accessor: (row) => (
-              <div style={{ whiteSpace: "nowrap", padding: "4px 0" }}>
-                {row.email}
-              </div>
-            ),
-          },
-          {
-            header: "Lead Type",
-            accessor: (row) => (
-              <div
-                style={{
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                  padding: "4px 0",
-                }}
-              >
-                {row.leadType}
-              </div>
-            ),
-            className: "col-center",
-          },
+          { header: "Customer Name", accessor: "name" },
+          { header: "Mobile", accessor: "mobile", className: "col-center" },
+          { header: "Email", accessor: "email" },
+          { header: "Lead Type", accessor: "leadType", className: "col-center" },
           {
             header: "Sub Type",
-            accessor: (row) => (
-              <div
-                style={{
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                  padding: "4px 0",
-                }}
-              >
-                {row.subType || "N/A"}
-              </div>
-            ),
+            accessor: (row) => row.subType || "N/A",
             className: "col-center",
           },
           {
-            header: "Date of Birth",
-            accessor: (row) => (
-              <div
-                style={{
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                  padding: "4px 0",
-                }}
-              >
-                {row.dob
-                  ? new Date(row.dob).toLocaleDateString("en-IN")
-                  : "N/A"}
-              </div>
-            ),
+            header: "Created On",
+            accessor: (row) =>
+              row.createdAt
+                ? new Date(row.createdAt).toLocaleDateString("en-IN")
+                : "-",
             className: "col-center",
           },
           {
-            header: "Status",
+            header: "Aging",
             accessor: (row) => (
-              <div
-                style={{
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                  padding: "4px 0",
-                }}
-              >
-                {row.status}
-              </div>
+              <div style={{ textAlign: "center" }}>{timeAgo(row.createdAt)}</div>
             ),
             className: "col-center",
           },
@@ -305,11 +257,21 @@ function FreePool() {
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "center",
+                  gap: "10px",
                   alignItems: "center",
-                  padding: "4px 0",
+                  justifyContent: "center",
                 }}
               >
+                {/* ✅ Workflow dropdown */}
+                <select
+                  value={row.workflowStatus || "FreePool"}
+                  onChange={(e) => updateWorkflow(row._id, e.target.value)}
+                  style={{ padding: "2px 6px" }}
+                >
+                  <option value="FreePool">Free Pool</option>
+                  <option value="Postpone">Postpone</option>
+                </select>
+
                 {(role === "admin" || role === "superadmin") && (
                   <FiTrash2
                     style={{
@@ -323,8 +285,6 @@ function FreePool() {
                 )}
               </div>
             ),
-            className: "col-center",
-            style: { width: "50px" },
           },
         ]}
         rows={filteredItems}
