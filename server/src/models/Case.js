@@ -1,3 +1,4 @@
+// server/src/models/Case.js
 import mongoose from "mongoose";
 
 const CaseSchema = new mongoose.Schema(
@@ -15,7 +16,10 @@ const CaseSchema = new mongoose.Schema(
     applicant2Mobile: { type: String },
     applicant2Email: { type: String },
 
-    // Loan Details
+    // Loan / Lead Details
+    leadType: { type: String },   // NEW: from Lead.leadType
+    subType: { type: String },    // NEW: from Lead.subType
+
     loanType: {
       type: String,
       enum: [
@@ -46,17 +50,10 @@ const CaseSchema = new mongoose.Schema(
     aadharNumber: { type: String },
 
     // 🔹 Legacy KYC uploads
-    // Example: { "kycDoc_0": ["file1.pdf","file2.png"] }
-    kycDocs: {
-      type: Object,
-      default: {},
-    },
+    kycDocs: { type: Object, default: {} },
 
-    // 🔹 New structured document sections (section → docs → files)
-    documentSections: {
-      type: Array, // keep flexible so it won’t break existing client/server code
-      default: [],
-    },
+    // 🔹 New structured document sections
+    documentSections: { type: Array, default: [] },
 
     // Extra
     notes: { type: String },

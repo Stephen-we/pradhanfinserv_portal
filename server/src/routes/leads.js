@@ -16,11 +16,11 @@ router.get("/test", (req, res) => res.json({ ok: true }));
 
 /* ================================
    ✅ LIST Leads (with pagination & filters)
-   Example: GET /api/leads?page=1&q=&status=free_pool&workflowStatus=Postpone
+   Example: GET /api/leads?page=1&q=&status=free_pool
 ================================ */
 router.get("/", auth, async (req, res, next) => {
   try {
-    const { q, page = 1, limit = 10, status, workflowStatus } = req.query;
+    const { q, page = 1, limit = 10, status } = req.query;
 
     const cond = {};
     if (q) {
@@ -32,9 +32,6 @@ router.get("/", auth, async (req, res, next) => {
       ];
     }
     if (status) cond.status = status;
-
-    // ✅ filter by workflowStatus if provided (FreePool / Postpone)
-    if (workflowStatus) cond.workflowStatus = workflowStatus;
 
     const data = await listWithPagination(
       Lead,
@@ -54,11 +51,7 @@ router.get("/", auth, async (req, res, next) => {
 ================================ */
 router.post("/", auth, async (req, res, next) => {
   try {
-    // ✅ Default workflowStatus = FreePool if not provided
-    const lead = new Lead({
-      ...req.body,
-      workflowStatus: req.body.workflowStatus || "FreePool",
-    });
+    const lead = new Lead(req.body);
     await lead.save();
     res.status(201).json(lead);
   } catch (e) {
@@ -87,14 +80,10 @@ router.get("/:id", auth, async (req, res, next) => {
 ================================ */
 router.put("/:id", auth, async (req, res, next) => {
   try {
-    const updated = await Lead.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const updated = await Lead.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
     if (!updated) return res.status(404).json({ message: "Lead not found" });
     res.json(updated);
   } catch (e) {
@@ -104,33 +93,13 @@ router.put("/:id", auth, async (req, res, next) => {
 
 /* ================================
    ✅ PATCH Lead (Partial Update)
-   - Supports notes, status, workflowStatus
 ================================ */
 router.patch("/:id", auth, async (req, res, next) => {
   try {
-    const allowedFields = [
-      "status",
-      "workflowStatus",  // ✅ allow workflowStatus updates
-      "notes",
-      "gdStatus",
-      "bank",
-      "branch",
-      "subType",
-      "assignedTo",
-    ];
-
-    // only pick allowed fields
-    const updateData = {};
-    for (const key of allowedFields) {
-      if (req.body[key] !== undefined) updateData[key] = req.body[key];
-    }
-
-    const updated = await Lead.findByIdAndUpdate(
-      req.params.id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    );
-
+    const updated = await Lead.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
     if (!updated) return res.status(404).json({ message: "Lead not found" });
     res.json(updated);
   } catch (e) {
@@ -153,9 +122,10 @@ router.delete("/:id", auth, async (req, res, next) => {
 
 /* ================================
    ✅ CONVERT Lead → Archived + Case + Customer
-   - workflowStatus is not touched (keeps history)
-================================ */
-router.patch(
+   - Uses the SAME ID: customerId = lead.leadId
+   - Saves channelPartner/bank/branch/status for Customer
+   - Idempotent (won’t create duplicates if re-run)
+================================ */router.patch(
   "/:id/convert",
   auth,
   allowRoles(["admin", "superadmin", "manager", "officer"]),
@@ -164,17 +134,16 @@ router.patch(
       const lead = await Lead.findById(req.params.id).populate("channelPartner");
       if (!lead) return res.status(404).json({ message: "Lead not found" });
 
-      // Always archive the lead (keeps your concept intact)
+      // Always archive the lead
       if (lead.status !== "archived") {
         lead.status = "archived";
         await lead.save();
       }
 
-      // ✅ workflowStatus is left untouched (you can still see if it was Postpone/FreePool before conversion)
-
       // ✅ CASE: reuse if already created
       let caseDoc = await Case.findOne({ leadId: lead.leadId });
       if (!caseDoc) {
+        // Ensure valid loan type
         const validLoanTypes = [
           "Home Loan",
           "Personal Loan",
@@ -189,8 +158,13 @@ router.patch(
         if (!validLoanTypes.includes(chosenLoanType)) chosenLoanType = "Home Loan";
 
         caseDoc = await Case.create({
-          caseId: lead.leadId,
+          caseId: lead.leadId,           // same id as lead
           leadId: lead.leadId,
+
+          // NEW
+          leadType: lead.leadType,
+          subType: lead.subType,
+
           loanType: chosenLoanType,
           status: "Pending",
           amount: lead.requirementAmount,
@@ -217,19 +191,23 @@ router.patch(
           name: lead.name,
           mobile: lead.mobile,
           email: lead.email,
+
           channelPartner: lead.channelPartner?.name || "",
           bankName: lead.bank || "",
           branch: lead.branch || "",
           status: "open",
+
           kyc: {
             pan: lead.pan || "",
             aadhar: lead.aadhar || "",
             files: [],
           },
+
           address: {
             permanent: { line1: lead.permanentAddress || "" },
             correspondence: { line1: lead.currentAddress || "" },
           },
+
           logNotes: lead.notes || "",
         });
       }
