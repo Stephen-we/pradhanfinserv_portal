@@ -124,8 +124,9 @@ router.delete("/:id", auth, async (req, res, next) => {
    ✅ CONVERT Lead → Archived + Case + Customer
    - Uses the SAME ID: customerId = lead.leadId
    - Saves channelPartner/bank/branch/status for Customer
-   - Idempotent (won’t create duplicates if re-run)
-================================ */router.patch(
+   - Idempotent (won't create duplicates if re-run)
+================================ */
+router.patch(
   "/:id/convert",
   auth,
   allowRoles(["admin", "superadmin", "manager", "officer"]),
@@ -165,6 +166,9 @@ router.delete("/:id", auth, async (req, res, next) => {
           leadType: lead.leadType,
           subType: lead.subType,
 
+          // ✅ ADD THIS: Transfer channel partner
+          channelPartner: lead.channelPartner?._id || lead.channelPartner,
+
           loanType: chosenLoanType,
           status: "Pending",
           amount: lead.requirementAmount,
@@ -177,8 +181,8 @@ router.delete("/:id", auth, async (req, res, next) => {
           currentAddress: lead.currentAddress,
           siteAddress: lead.siteAddress,
           officeAddress: lead.officeAddress,
-          pan: lead.pan,
-          aadhar: lead.aadhar,
+          panNumber: lead.pan,           // ✅ FIXED: should be panNumber
+          aadharNumber: lead.aadhar,     // ✅ FIXED: should be aadharNumber
           notes: lead.notes || "",
         });
       }
@@ -225,5 +229,6 @@ router.delete("/:id", auth, async (req, res, next) => {
     }
   }
 );
+
 
 export default router;

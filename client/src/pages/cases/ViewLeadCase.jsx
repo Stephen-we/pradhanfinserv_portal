@@ -328,20 +328,40 @@ export default function ViewLeadCase() {
           </div>
         </div>
 
-        {/* Lead Information */}
-        <div className="info-card">
-          <div className="card-header">
-            <FiTrendingUp className="card-icon" />
-            <h3>Lead Information</h3>
-            <FiEdit className="edit-icon" onClick={goEdit} title="Edit" />
-          </div>
-          <div className="card-content">
-            <div className="info-row"><label>Lead Type</label><span>{show(caseData.leadType)}</span></div>
-            <div className="info-row"><label>Lead Sub Type</label><span>{show(caseData.subType)}</span></div>
-            {/* ❌ Removed Loan Type here */}
-            <div className="info-row"><label>Channel Partner</label><span>{show(caseData.channelPartner)}</span></div>
+       {/* Lead Information */}
+          <div className="info-card">
+            <div className="card-header">
+              <FiTrendingUp className="card-icon" />
+              <h3>Lead Information</h3>
+              <FiEdit className="edit-icon" onClick={goEdit} title="Edit" />
+            </div>
+            <div className="card-content">
+              <div className="info-row"><label>Lead Type</label><span>{show(caseData.leadType)}</span></div>
+              <div className="info-row"><label>Lead Sub Type</label><span>{show(caseData.subType)}</span></div>
+              
+              {/* ✅ Fixed Channel Partner Display */}
+              <div className="info-row">
+                <label>Channel Partner</label>
+                <span>
+                  {caseData.channelPartner ? (
+                    typeof caseData.channelPartner === 'object' 
+                      ? caseData.channelPartner.name || caseData.channelPartner 
+                      : caseData.channelPartner
+                  ) : "-"}
+                </span>
+                </div>
+    
+            {/* ✅ Add Partner Contact if available */}
+            {caseData.channelPartner && typeof caseData.channelPartner === 'object' && caseData.channelPartner.contact && (
+              <div className="info-row">
+                <label>Partner Contact</label>
+                <span>{show(caseData.channelPartner.contact)}</span>
+                
+              </div>
+            )}
           </div>
         </div>
+
 
         {/* Applicant */}
         <div className="info-card">

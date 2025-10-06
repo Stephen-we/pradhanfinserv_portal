@@ -1,3 +1,4 @@
+// server/src/routes/cases.js
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -14,45 +15,49 @@ import { upload } from "../middleware/uploads.js";
 const router = express.Router();
 
 //
+//
 // ✅ List with pagination + search (single, enhanced version)
 //
-router.get("/", auth, async (req, res, next) => {
-  try {
-    const { q, page = 1, limit = 10 } = req.query;
+  router.get("/", auth, async (req, res, next) => {
+    try {
+      const { q, page = 1, limit = 10 } = req.query;
 
-    const cond = q
-      ? {
-          $or: [
-            { caseId: { $regex: q, $options: "i" } },
-            { loanType: { $regex: q, $options: "i" } },
-            { customerName: { $regex: q, $options: "i" } },
-            { mobile: { $regex: q, $options: "i" } },
-          ],
-        }
-      : {};
+      const cond = q
+        ? {
+            $or: [
+              { caseId: { $regex: q, $options: "i" } },
+              { loanType: { $regex: q, $options: "i" } },
+              { customerName: { $regex: q, $options: "i" } },
+              { mobile: { $regex: q, $options: "i" } },
+            ],
+          }
+        : {};
 
-    const data = await listWithPagination(
-      Case,
-      cond,
-      { page, limit },
-      { path: "assignedTo", select: "name role", model: "User" }
-    );
+      const data = await listWithPagination(
+        Case,
+        cond,
+        { page, limit },
+        [
+          { path: "assignedTo", select: "name role", model: "User" },
+          { path: "channelPartner", select: "name contact email", model: "ChannelPartner" } // ✅ ADD THIS
+        ]
+      );
 
-    res.json(data);
-  } catch (e) {
-    next(e);
-  }
-});
+      res.json(data);
+    } catch (e) {
+      next(e);
+    }
+  });
 
 //
-// ✅ Get single case - normalize kycDocs + support documentSections (AUTH)
 //
+// ✅ Get single case - normalize kycDocs + support documentSections (AUTH) //
 router.get("/:id", auth, async (req, res, next) => {
   try {
-    const item = await Case.findById(req.params.id).populate(
-      "assignedTo",
-      "name role"
-    );
+    const item = await Case.findById(req.params.id)
+      .populate("assignedTo", "name role")
+      .populate("channelPartner", "name contact email"); // ✅ ADD THIS POPULATE
+
     if (!item) return res.status(404).json({ message: "Case not found" });
 
     const caseObj = item.toObject();
@@ -87,6 +92,7 @@ router.get("/:id", auth, async (req, res, next) => {
     next(e);
   }
 });
+
 
 //
 // 🔓 PUBLIC: Get single case for public form (NO AUTH)
@@ -151,6 +157,9 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       // ✅ NEW: Keep leadType & subType in updates
       leadType: body.leadType,
       subType: body.subType,
+
+      // ✅ ADD THIS: Handle channelPartner
+      channelPartner: body.channelPartner,
 
       loanType: body.loanType,
       amount:

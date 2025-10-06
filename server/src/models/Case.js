@@ -1,4 +1,3 @@
-// server/src/models/Case.js
 import mongoose from "mongoose";
 
 const CaseSchema = new mongoose.Schema(
@@ -19,6 +18,12 @@ const CaseSchema = new mongoose.Schema(
     // Loan / Lead Details
     leadType: { type: String },   // NEW: from Lead.leadType
     subType: { type: String },    // NEW: from Lead.subType
+
+    // ✅ ADD THIS: Channel Partner reference
+    channelPartner: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "ChannelPartner" 
+    },
 
     loanType: {
       type: String,
