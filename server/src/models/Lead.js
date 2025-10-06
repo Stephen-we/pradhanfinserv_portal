@@ -54,6 +54,13 @@ const LeadSchema = new mongoose.Schema(
     requirementAmount: Number,
     sanctionedAmount: Number,
 
+    // Workflow tracking
+    workflowStatus: {
+      type: String,
+      enum: ["FreePool", "Postpone"],
+      default: "FreePool"
+    },
+
     // Status
     status: { 
       type: String, 
