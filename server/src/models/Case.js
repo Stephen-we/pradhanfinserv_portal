@@ -1,3 +1,4 @@
+// server/src/models/Case.js
 import mongoose from "mongoose";
 
 const CaseSchema = new mongoose.Schema(

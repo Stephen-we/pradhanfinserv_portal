@@ -1,4 +1,3 @@
-// server/src/routes/cases.js
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -15,48 +14,47 @@ import { upload } from "../middleware/uploads.js";
 const router = express.Router();
 
 //
+// ✅ List with pagination + search
 //
-// ✅ List with pagination + search (single, enhanced version)
-//
-  router.get("/", auth, async (req, res, next) => {
-    try {
-      const { q, page = 1, limit = 10 } = req.query;
+router.get("/", auth, async (req, res, next) => {
+  try {
+    const { q, page = 1, limit = 10 } = req.query;
 
-      const cond = q
-        ? {
-            $or: [
-              { caseId: { $regex: q, $options: "i" } },
-              { loanType: { $regex: q, $options: "i" } },
-              { customerName: { $regex: q, $options: "i" } },
-              { mobile: { $regex: q, $options: "i" } },
-            ],
-          }
-        : {};
+    const cond = q
+      ? {
+          $or: [
+            { caseId: { $regex: q, $options: "i" } },
+            { loanType: { $regex: q, $options: "i" } },
+            { customerName: { $regex: q, $options: "i" } },
+            { mobile: { $regex: q, $options: "i" } },
+          ],
+        }
+      : {};
 
-      const data = await listWithPagination(
-        Case,
-        cond,
-        { page, limit },
-        [
-          { path: "assignedTo", select: "name role", model: "User" },
-          { path: "channelPartner", select: "name contact email", model: "ChannelPartner" } // ✅ ADD THIS
-        ]
-      );
+    const data = await listWithPagination(
+      Case,
+      cond,
+      { page, limit },
+      [
+        { path: "assignedTo", select: "name role", model: "User" },
+        { path: "channelPartner", select: "name contact email", model: "ChannelPartner" }
+      ]
+    );
 
-      res.json(data);
-    } catch (e) {
-      next(e);
-    }
-  });
+    res.json(data);
+  } catch (e) {
+    next(e);
+  }
+});
 
 //
+// ✅ Get single case - normalize kycDocs + support documentSections (AUTH)
 //
-// ✅ Get single case - normalize kycDocs + support documentSections (AUTH) //
 router.get("/:id", auth, async (req, res, next) => {
   try {
     const item = await Case.findById(req.params.id)
       .populate("assignedTo", "name role")
-      .populate("channelPartner", "name contact email"); // ✅ ADD THIS POPULATE
+      .populate("channelPartner", "name contact email");
 
     if (!item) return res.status(404).json({ message: "Case not found" });
 
@@ -93,9 +91,8 @@ router.get("/:id", auth, async (req, res, next) => {
   }
 });
 
-
 //
-// 🔓 PUBLIC: Get single case for public form (NO AUTH)
+// 🔓 PUBLIC: Get single case (NO AUTH)
 //
 router.get("/:id/public", async (req, res, next) => {
   try {
@@ -136,14 +133,12 @@ router.get("/:id/public", async (req, res, next) => {
 });
 
 //
-// ✅ Update case with support for both KYC docs and documentSections (AUTH)
+// ✅ Update case with safe handling for assignedTo + channelPartner (AUTH)
 //
 router.put("/:id", auth, upload.any(), async (req, res, next) => {
   try {
     const prev = await Case.findById(req.params.id);
     if (!prev) return res.status(404).json({ message: "Case not found" });
-
-    const prevAssigned = prev.assignedTo ? String(prev.assignedTo) : null;
 
     const body = req.body || {};
     const updateData = {
@@ -154,13 +149,8 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       applicant2Mobile: body.applicant2Mobile,
       applicant2Email: body.applicant2Email,
 
-      // ✅ NEW: Keep leadType & subType in updates
       leadType: body.leadType,
       subType: body.subType,
-
-      // ✅ ADD THIS: Handle channelPartner
-      channelPartner: body.channelPartner,
-
       loanType: body.loanType,
       amount:
         body.amount && body.amount !== "null" ? Number(body.amount) : undefined,
@@ -181,27 +171,47 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       task: body.task,
     };
 
-    // ✅ AssignedTo handling...
+    // ✅ AssignedTo handling (Safe fallback)
     let resolvedAssignedTo;
     if ("assignedTo" in body) {
       const raw = body.assignedTo;
-
-      if (raw === "" || raw === "null" || raw == null) {
+      if (!raw || raw === "null" || raw === "" || raw === "undefined") {
         resolvedAssignedTo = null;
-      } else if (typeof raw === "object" && raw?._id) {
+      } else if (typeof raw === "object" && raw._id) {
         resolvedAssignedTo = String(raw._id);
       } else if (mongoose.Types.ObjectId.isValid(String(raw))) {
-        const exists = await User.exists({ _id: raw });
-        if (!exists)
-          return res.status(400).json({ message: "Assigned user not found" });
         resolvedAssignedTo = String(raw);
       } else {
-        return res.status(400).json({ message: "Invalid assignedTo value" });
+        console.warn("⚠️ Skipping invalid assignedTo:", raw);
       }
     }
     if (resolvedAssignedTo !== undefined) {
       updateData.assignedTo = resolvedAssignedTo;
     }
+
+    // ✅ ChannelPartner handling (Safe fallback)
+    let resolvedChannelPartner;
+    try {
+      const rawPartner = body.channelPartner;
+      if (
+        !rawPartner ||
+        rawPartner === "null" ||
+        rawPartner === "" ||
+        rawPartner === "undefined"
+      ) {
+        resolvedChannelPartner = null;
+      } else if (typeof rawPartner === "object" && rawPartner._id) {
+        resolvedChannelPartner = rawPartner._id;
+      } else if (mongoose.Types.ObjectId.isValid(String(rawPartner))) {
+        resolvedChannelPartner = String(rawPartner);
+      } else {
+        console.warn("⚠️ Skipping invalid channelPartner:", rawPartner);
+        resolvedChannelPartner = null;
+      }
+    } catch {
+      resolvedChannelPartner = null;
+    }
+    updateData.channelPartner = resolvedChannelPartner;
 
     // 🔹 Handle documentSections...
     let documentSections = [];
@@ -238,7 +248,9 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
     const item = await Case.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
-    }).populate("assignedTo", "name role");
+    })
+      .populate("assignedTo", "name role")
+      .populate("channelPartner", "name contact email");
 
     await CaseAudit.create({
       case: item._id,
@@ -253,7 +265,7 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
 });
 
 //
-// 🔓 PUBLIC: Update case (NO AUTH) — for clients via public form
+// 🔓 PUBLIC: Update case (NO AUTH)
 //
 router.put("/:id/public", upload.any(), async (req, res, next) => {
   try {
@@ -268,11 +280,8 @@ router.put("/:id/public", upload.any(), async (req, res, next) => {
       applicant2Name: body.applicant2Name,
       applicant2Mobile: body.applicant2Mobile,
       applicant2Email: body.applicant2Email,
-
-      // ✅ NEW: Keep leadType & subType in public updates too
       leadType: body.leadType,
       subType: body.subType,
-
       loanType: body.loanType,
       amount:
         body.amount && body.amount !== "null" ? Number(body.amount) : undefined,
@@ -293,7 +302,7 @@ router.put("/:id/public", upload.any(), async (req, res, next) => {
       task: body.task,
     };
 
-    // 🔹 Handle documentSections (same as above)
+    // 🔹 Handle documentSections
     let documentSections = [];
     try {
       let raw = body.documentSections;
@@ -390,7 +399,7 @@ router.get("/:id/download", auth, async (req, res, next) => {
       }
     }
 
-    // ✅ Legacy structure fallback
+    // ✅ Legacy fallback
     if (fileCount === 0 && caseObj.kycDocs) {
       const kycDocs =
         caseObj.kycDocs instanceof Map

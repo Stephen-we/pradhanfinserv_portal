@@ -1,4 +1,3 @@
-// client/src/pages/cases/LeadFormCase.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import API from "../../services/api";
@@ -8,16 +7,18 @@ export default function LeadFormCase() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // 🔹 Detect public mode based on URL path: /cases/:id/public-form
-  const isPublic = typeof window !== "undefined" && window.location.pathname.includes("public-form");
+  // 🔹 Detect public mode
+  const isPublic =
+    typeof window !== "undefined" &&
+    window.location.pathname.includes("public-form");
 
   const [form, setForm] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCoApplicant, setShowCoApplicant] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successProgress, setSuccessProgress] = useState(0);
-  
-  // ✅ Document Management State
+
+  // ✅ Document Management
   const [documentSections, setDocumentSections] = useState([
     {
       id: "section-1",
@@ -36,29 +37,23 @@ export default function LeadFormCase() {
         { id: "doc-1-11", name: "Partnership Deed (if required)", files: [] },
         { id: "doc-1-12", name: "MOA & AOA Company Registration", files: [] },
         { id: "doc-1-13", name: "Form 26AS Last 3 Years", files: [] },
-      ]
-    }
+      ],
+    },
   ]);
 
-  // -------- Enhanced Success Popup --------
+  // -------- Success Popup Animation --------
   const showEnhancedSuccess = () => {
     setShowSuccessPopup(true);
     setSuccessProgress(0);
-    
-    // Animate progress bar
     const interval = setInterval(() => {
-      setSuccessProgress(prev => {
+      setSuccessProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
           setTimeout(() => {
-            // 🔹 In public mode: do NOT redirect to protected /view (would require login)
             if (!isPublic) {
               setShowSuccessPopup(false);
               navigate(`/cases/${id}/view`);
-            } else {
-              // In public mode, just close the popup after completion
-              setShowSuccessPopup(false);
-            }
+            } else setShowSuccessPopup(false);
           }, 1000);
           return 100;
         }
@@ -69,7 +64,6 @@ export default function LeadFormCase() {
 
   // -------- Load Case --------
   useEffect(() => {
-    // 🔹 Use public endpoint in public mode
     const url = isPublic ? `/cases/${id}/public` : `/cases/${id}`;
     API.get(url)
       .then(({ data }) => {
@@ -80,175 +74,118 @@ export default function LeadFormCase() {
           email: data.email || "",
         });
         if (data.applicant2Name) setShowCoApplicant(true);
-        
-        // ✅ Load existing documents - support both old and new structures
-        if (data.documentSections && data.documentSections.length > 0) {
+        if (data.documentSections?.length) {
           setDocumentSections(data.documentSections);
         } else if (data.kycDocs) {
-          // Convert old structure to new structure
-          const convertedSections = convertOldToNewStructure(data.kycDocs);
-          setDocumentSections(convertedSections);
+          setDocumentSections(convertOldToNewStructure(data.kycDocs));
         }
       })
       .catch(() => alert("Unable to load case"));
   }, [id, isPublic]);
 
-  // Convert old kycDocs structure to new documentSections structure
   const convertOldToNewStructure = (kycDocs) => {
-    // If no old KYC docs, return the default structure
-    if (!kycDocs || Object.keys(kycDocs).length === 0) {
-      return documentSections; // Return current default structure
-    }
-    
-    // If there are old KYC docs, convert them quickly without flash
-    const defaultSection = documentSections[0]; // Use the default structure
-    return [defaultSection]; // Return array with just the KYC section
+    if (!kycDocs || Object.keys(kycDocs).length === 0) return documentSections;
+    return [documentSections[0]];
   };
 
-  // -------- Document Handlers --------
+  // -------- File & Document Handlers --------
   const handleFileUpload = (files, sectionIndex, docIndex) => {
     const fileList = Array.from(files);
-    
-    setDocumentSections(prev => {
-      const updatedSections = [...prev];
-      const currentSection = updatedSections[sectionIndex];
-      const currentDocument = currentSection.documents[docIndex];
-      
-      const newFiles = fileList.map(file => ({
+    setDocumentSections((prev) => {
+      const updated = [...prev];
+      const doc = updated[sectionIndex].documents[docIndex];
+      const newFiles = fileList.map((file) => ({
         id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: file.name,
-        file: file, // Actual File object for new uploads
+        file,
         filename: file.name,
         type: file.type,
         size: file.size,
         uploadDate: new Date().toISOString(),
-        isUploaded: false // Mark as new file to be uploaded
+        isUploaded: false,
       }));
-
-      // Add new files to existing ones
-      currentDocument.files = [...currentDocument.files, ...newFiles];
-      
-      return updatedSections;
+      doc.files = [...doc.files, ...newFiles];
+      return updated;
     });
   };
 
   const removeFile = (sectionIndex, docIndex, fileIndex) => {
-    setDocumentSections(prev => {
-      const updatedSections = [...prev];
-      updatedSections[sectionIndex].documents[docIndex].files.splice(fileIndex, 1);
-      return updatedSections;
+    setDocumentSections((prev) => {
+      const updated = [...prev];
+      updated[sectionIndex].documents[docIndex].files.splice(fileIndex, 1);
+      return updated;
     });
   };
 
-  const addDocumentSection = () => {
-    setDocumentSections(prev => [
+  const addDocumentSection = () =>
+    setDocumentSections((prev) => [
       ...prev,
       {
         id: `section-${Date.now()}`,
         name: `Additional Documents ${prev.length + 1}`,
-        documents: [
-          { 
-            id: `doc-${prev.length + 1}-1`, 
-            name: "New Document Type", 
-            files: [] 
-          }
-        ]
-      }
+        documents: [{ id: `doc-${prev.length + 1}-1`, name: "New Document Type", files: [] }],
+      },
     ]);
-  };
 
-  const removeDocumentSection = (sectionIndex) => {
-    if (documentSections.length <= 1) {
-      alert("At least one document section is required");
-      return;
-    }
-    setDocumentSections(prev => prev.filter((_, index) => index !== sectionIndex));
+  const removeDocumentSection = (index) => {
+    if (documentSections.length <= 1) return alert("At least one section required");
+    setDocumentSections((prev) => prev.filter((_, i) => i !== index));
   };
 
   const addDocumentType = (sectionIndex) => {
-    setDocumentSections(prev => {
-      const updatedSections = [...prev];
-      const section = updatedSections[sectionIndex];
-      const newDocIndex = section.documents.length + 1;
-      
+    setDocumentSections((prev) => {
+      const updated = [...prev];
+      const section = updated[sectionIndex];
       section.documents.push({
-        id: `doc-${sectionIndex + 1}-${newDocIndex}`,
+        id: `doc-${sectionIndex + 1}-${section.documents.length + 1}`,
         name: "New Document Type",
-        files: []
+        files: [],
       });
-      return updatedSections;
+      return updated;
     });
   };
 
   const updateDocumentTypeName = (sectionIndex, docIndex, newName) => {
-    setDocumentSections(prev => {
-      const updatedSections = [...prev];
-      updatedSections[sectionIndex].documents[docIndex].name = newName;
-      return updatedSections;
-    });
-  };
-
-  const removeDocumentType = (sectionIndex, docIndex) => {
-    setDocumentSections(prev => {
-      const updatedSections = [...prev];
-      const section = updatedSections[sectionIndex];
-      
-      if (section.documents.length <= 1) {
-        alert("At least one document type is required in each section");
-        return prev;
-      }
-      
-      section.documents.splice(docIndex, 1);
-      return updatedSections;
+    setDocumentSections((prev) => {
+      const updated = [...prev];
+      updated[sectionIndex].documents[docIndex].name = newName;
+      return updated;
     });
   };
 
   // -------- Form Handlers --------
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // PAN: 10 chars, uppercase alphanumeric
   const handlePANChange = (e) => {
     const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
-    setForm((prev) => ({ ...prev, panNumber: v }));
+    setForm((p) => ({ ...p, panNumber: v }));
   };
 
-  // Aadhaar: digits only, 12 length
   const handleAadhaarChange = (e) => {
     const v = e.target.value.replace(/\D/g, "").slice(0, 12);
-    setForm((prev) => ({ ...prev, aadharNumber: v }));
+    setForm((p) => ({ ...p, aadharNumber: v }));
   };
 
-  // ✅ Progress calculation - includes documents
+  // -------- Progress --------
   const progress = useMemo(() => {
     const requiredFields = [
       "leadId",
       "customerName",
       "mobile",
       "email",
-      "loanType",
+      "leadType", // ✅ replaced loanType
       "amount",
       "permanentAddress",
     ];
-    const filled = requiredFields.filter(
-      (f) => form[f] && form[f].toString().trim() !== ""
+    const filled = requiredFields.filter((f) => form[f]?.toString().trim());
+    const hasDocs = documentSections.some((s) =>
+      s.documents.some((d) => d.files.length > 0)
     );
-    
-    // Check if any documents are uploaded
-    const hasDocuments = documentSections.some(section => 
-      section.documents.some(doc => doc.files.length > 0)
-    );
-    
-    // Base form progress (70%) + documents progress (30%)
-    const baseProgress = Math.round((filled.length / requiredFields.length) * 70);
-    const documentProgress = hasDocuments ? 30 : 0;
-    
-    return baseProgress + documentProgress;
+    const base = Math.round((filled.length / requiredFields.length) * 70);
+    return base + (hasDocs ? 30 : 0);
   }, [form, documentSections]);
 
   // -------- Submit --------
@@ -257,95 +194,68 @@ export default function LeadFormCase() {
     setIsSubmitting(true);
     try {
       const fd = new FormData();
+      for (const k in form)
+        if (form[k] !== undefined && form[k] !== null) fd.append(k, form[k]);
+      fd.append("documentSections", JSON.stringify(documentSections));
 
-      // Append all normal text fields
-      for (const key in form) {
-        if (form[key] !== undefined && form[key] !== null) {
-          fd.append(key, form[key]);
-        }
-      }
-
-      // ✅ Append document sections structure
-      fd.append('documentSections', JSON.stringify(documentSections));
-
-      // ✅ Append all files from document sections WITH METADATA
-      let totalFiles = 0;
-      documentSections.forEach((section, sectionIndex) => {
-        section.documents.forEach((doc, docIndex) => {
+      documentSections.forEach((section, sIdx) =>
+        section.documents.forEach((doc, dIdx) =>
           doc.files.forEach((fileObj) => {
-            // Only append new files (not already uploaded ones)
             if (fileObj.file && !fileObj.isUploaded) {
-              fd.append('documents', fileObj.file);
-              
-              // 🔥 CRITICAL: Append metadata for backend mapping
-              fd.append('documents_sectionIndex', sectionIndex.toString());
-              fd.append('documents_docIndex', docIndex.toString());
-              fd.append('documents_docId', doc.id);
-              
-              console.log(`📤 Appending file: ${fileObj.name} to section ${sectionIndex}, doc ${docIndex}, id: ${doc.id}`);
-              totalFiles++;
+              fd.append("documents", fileObj.file);
+              fd.append("documents_sectionIndex", sIdx.toString());
+              fd.append("documents_docIndex", dIdx.toString());
+              fd.append("documents_docId", doc.id);
             }
-          });
-        });
-      });
+          })
+        )
+      );
 
-      console.log(`📦 Submitting form with ${totalFiles} new files and ${documentSections.length} document sections`);
-
-      // 🔹 Use public endpoint in public mode
       const url = isPublic ? `/cases/${id}/public` : `/cases/${id}`;
-      const response = await API.put(url, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      console.log("✅ Case updated successfully:", response.data);
-      
-      // Show enhanced success popup instead of simple alert
+      await API.put(url, fd, { headers: { "Content-Type": "multipart/form-data" } });
       showEnhancedSuccess();
-      
     } catch (err) {
-      console.error("❌ Failed to submit case:", err);
-      console.error("Error details:", err.response?.data);
+      console.error("❌ Submit failed:", err);
       alert(err.response?.data?.message || "Failed to submit case");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Helper to count total files
-  const totalFiles = useMemo(() => {
-    return documentSections.reduce((total, section) => {
-      return total + section.documents.reduce((docTotal, doc) => {
-        return docTotal + doc.files.length;
-      }, 0);
-    }, 0);
-  }, [documentSections]);
+  const totalFiles = useMemo(
+    () =>
+      documentSections.reduce(
+        (total, s) => total + s.documents.reduce((sum, d) => sum + d.files.length, 0),
+        0
+      ),
+    [documentSections]
+  );
 
   if (!form) return <p>Loading...</p>;
 
   return (
     <div className="lead-form-container">
-      {/* 🔹 Enhanced Success Popup */}
+      {/* ✅ Success Popup */}
       {showSuccessPopup && (
         <div className="success-popup-overlay">
           <div className="success-popup">
             <div className="success-icon">✅</div>
             <h3>Form Submitted Successfully!</h3>
             <p>All documents and case information have been saved.</p>
-            
+
             <div className="success-progress-container">
               <div className="success-progress-bar">
-                <div 
-                  className="success-progress-fill"
-                  style={{ width: `${successProgress}%` }}
-                />
+                <div className="success-progress-fill" style={{ width: `${successProgress}%` }} />
               </div>
               <span className="success-progress-text">
-                {successProgress === 100 
-                  ? (isPublic ? 'Complete!' : 'Complete! Redirecting...') 
+                {successProgress === 100
+                  ? isPublic
+                    ? "Complete!"
+                    : "Complete! Redirecting..."
                   : `Processing... ${successProgress}%`}
               </span>
             </div>
-            
+
             <div className="success-stats">
               <div className="stat-item">
                 <span className="stat-number">{documentSections.length}</span>
@@ -364,7 +274,7 @@ export default function LeadFormCase() {
         </div>
       )}
 
-      {/* 🔹 Progress Bar */}
+      {/* ✅ Progress Bar */}
       <div className="progress-wrapper">
         <label>
           <b>Progress:</b> {progress}% | <b>Total Files:</b> {totalFiles}
@@ -377,23 +287,39 @@ export default function LeadFormCase() {
         </div>
       </div>
 
+      {/* ✅ Form Starts */}
       <form onSubmit={handleSubmit} className="lead-form-card">
-        {/* Case Details */}
         <h3 className="form-section-title">Case Details</h3>
         <div className="section">
           <label>Lead ID</label>
           <input type="text" value={form.leadId || ""} readOnly />
         </div>
-        <div className="section">
-          <label>Loan Type</label>
-          <input
-            type="text"
-            name="loanType"
-            value={form.loanType || ""}
-            onChange={handleChange}
-            required
-          />
+
+        {/* ✅ Lead Type + Sub Type */}
+        <div className="grid-2">
+          <div className="section">
+            <label>Lead Type *</label>
+            <input
+              type="text"
+              name="leadType"
+              value={form.leadType || ""}
+              onChange={handleChange}
+              placeholder="e.g. Business Loan, Real Estate, Insurance"
+              required
+            />
+          </div>
+          <div className="section">
+            <label>Lead Sub Type</label>
+            <input
+              type="text"
+              name="subType"
+              value={form.subType || ""}
+              onChange={handleChange}
+              placeholder="e.g. Construction Loan, MSME, etc."
+            />
+          </div>
         </div>
+
         <div className="section">
           <label>Amount</label>
           <input
@@ -405,7 +331,7 @@ export default function LeadFormCase() {
           />
         </div>
 
-        {/* Applicant Details */}
+        {/* ✅ Applicant Section */}
         <h3 className="form-section-title">Applicant Details</h3>
         <div className="section">
           <label>Applicant Name *</label>
@@ -490,7 +416,7 @@ export default function LeadFormCase() {
           </button>
         )}
 
-        {/* Contact Details */}
+        {/* ✅ Addresses */}
         <h3 className="form-section-title">Contact Details</h3>
         <div className="section">
           <label>Permanent Address *</label>
@@ -526,7 +452,7 @@ export default function LeadFormCase() {
           />
         </div>
 
-        {/* KYC Quick Details */}
+        {/* ✅ KYC Details */}
         <h3 className="form-section-title">KYC Details (Self-Employed)</h3>
         <div className="grid-2">
           <div className="section">
@@ -553,7 +479,7 @@ export default function LeadFormCase() {
           </div>
         </div>
 
-        {/* ✅ Enhanced Document Uploads */}
+        {/* ✅ Document Uploads */}
         <div className="document-sections-container">
           <div className="section-header">
             <h3 className="form-section-title">Document Uploads</h3>
@@ -569,7 +495,7 @@ export default function LeadFormCase() {
             </div>
           </div>
 
-          {documentSections.map((section, sectionIndex) => (
+          {documentSections.map((section, sIdx) => (
             <div key={section.id} className="document-section">
               <div className="section-header">
                 <input
@@ -577,9 +503,9 @@ export default function LeadFormCase() {
                   className="section-name-input"
                   value={section.name}
                   onChange={(e) => {
-                    const updatedSections = [...documentSections];
-                    updatedSections[sectionIndex].name = e.target.value;
-                    setDocumentSections(updatedSections);
+                    const updated = [...documentSections];
+                    updated[sIdx].name = e.target.value;
+                    setDocumentSections(updated);
                   }}
                   placeholder="Section Name"
                 />
@@ -587,52 +513,58 @@ export default function LeadFormCase() {
                   <button
                     type="button"
                     className="btn danger"
-                    onClick={() => removeDocumentSection(sectionIndex)}
+                    onClick={() => removeDocumentSection(sIdx)}
                   >
                     ✕ Remove Section
                   </button>
                 )}
               </div>
 
-              {section.documents.map((doc, docIndex) => (
+              {section.documents.map((doc, dIdx) => (
                 <div key={doc.id} className="document-item">
                   <div className="document-header">
                     <input
                       type="text"
                       className="document-type-input"
                       value={doc.name}
-                      onChange={(e) => updateDocumentTypeName(sectionIndex, docIndex, e.target.value)}
+                      onChange={(e) =>
+                        updateDocumentTypeName(sIdx, dIdx, e.target.value)
+                      }
                       placeholder="Document Type Name"
                     />
-                    <span className="file-count">
-                      {doc.files.length} file(s)
-                    </span>
+                    <span className="file-count">{doc.files.length} file(s)</span>
                     {section.documents.length > 1 && (
                       <button
                         type="button"
                         className="btn danger small"
-                        onClick={() => removeDocumentType(sectionIndex, docIndex)}
+                        onClick={() =>
+                          removeFile(sIdx, dIdx, section.documents.length - 1)
+                        }
                       >
                         ✕ Remove
                       </button>
                     )}
                   </div>
 
-                  {/* File List */}
+                  {/* File list */}
                   <div className="file-list">
-                    {doc.files.map((file, fileIndex) => (
+                    {doc.files.map((file, fIdx) => (
                       <div key={file.id} className="file-item">
                         <span className="file-name">{file.name}</span>
-                        <span className={`file-status ${file.isUploaded ? 'uploaded' : 'new'}`}>
-                          {file.isUploaded ? '(Uploaded)' : '(New)'}
+                        <span
+                          className={`file-status ${
+                            file.isUploaded ? "uploaded" : "new"
+                          }`}
+                        >
+                          {file.isUploaded ? "(Uploaded)" : "(New)"}
                         </span>
                         <span className="file-size">
-                          {file.size > 0 ? `(${Math.round(file.size / 1024)} KB)` : ''}
+                          {file.size > 0 ? `(${Math.round(file.size / 1024)} KB)` : ""}
                         </span>
                         <button
                           type="button"
                           className="btn danger small"
-                          onClick={() => removeFile(sectionIndex, docIndex, fileIndex)}
+                          onClick={() => removeFile(sIdx, dIdx, fIdx)}
                         >
                           ✕
                         </button>
@@ -640,17 +572,17 @@ export default function LeadFormCase() {
                     ))}
                   </div>
 
-                  {/* Upload Buttons */}
+                  {/* Upload buttons */}
                   <div className="upload-buttons">
                     <label className="btn secondary small">
                       <input
                         type="file"
                         multiple
                         onChange={(e) => {
-                          handleFileUpload(e.target.files, sectionIndex, docIndex);
-                          e.target.value = '';
+                          handleFileUpload(e.target.files, sIdx, dIdx);
+                          e.target.value = "";
                         }}
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                       />
                       📁 Add Multiple Files
                     </label>
@@ -658,10 +590,10 @@ export default function LeadFormCase() {
                       <input
                         type="file"
                         onChange={(e) => {
-                          handleFileUpload(e.target.files, sectionIndex, docIndex);
-                          e.target.value = '';
+                          handleFileUpload(e.target.files, sIdx, dIdx);
+                          e.target.value = "";
                         }}
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                       />
                       📄 Add Single File
                     </label>
@@ -672,7 +604,7 @@ export default function LeadFormCase() {
               <button
                 type="button"
                 className="btn secondary small"
-                onClick={() => addDocumentType(sectionIndex)}
+                onClick={() => addDocumentType(sIdx)}
               >
                 + Add Document Type
               </button>
@@ -680,13 +612,9 @@ export default function LeadFormCase() {
           ))}
         </div>
 
-        {/* Actions */}
+        {/* ✅ Actions */}
         <div className="form-actions">
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={() => navigate(-1)}
-          >
+          <button type="button" className="btn secondary" onClick={() => navigate(-1)}>
             ← Back
           </button>
           <button type="submit" className="btn primary" disabled={isSubmitting}>
