@@ -6,41 +6,33 @@ import mongoose from "mongoose";
 
 import Case from "../models/Case.js";
 import CaseAudit from "../models/CaseAudit.js";
-import User from "../models/User.js";
 import { auth } from "../middleware/auth.js";
-import { listWithPagination } from "../utils/paginate.js";
 import { upload } from "../middleware/uploads.js";
+import { listWithPagination } from "../utils/paginate.js";
 
 const router = express.Router();
 
 //
-// ✅ List with pagination + search
+// ✅ List cases
 //
 router.get("/", auth, async (req, res, next) => {
   try {
     const { q, page = 1, limit = 10 } = req.query;
-
     const cond = q
       ? {
           $or: [
             { caseId: { $regex: q, $options: "i" } },
-            { loanType: { $regex: q, $options: "i" } },
+            { leadType: { $regex: q, $options: "i" } },
             { customerName: { $regex: q, $options: "i" } },
             { mobile: { $regex: q, $options: "i" } },
           ],
         }
       : {};
 
-    const data = await listWithPagination(
-      Case,
-      cond,
-      { page, limit },
-      [
-        { path: "assignedTo", select: "name role", model: "User" },
-        { path: "channelPartner", select: "name contact email", model: "ChannelPartner" }
-      ]
-    );
-
+    const data = await listWithPagination(Case, cond, { page, limit }, [
+      { path: "assignedTo", select: "name role", model: "User" },
+      { path: "channelPartner", select: "name contact email", model: "ChannelPartner" },
+    ]);
     res.json(data);
   } catch (e) {
     next(e);
@@ -48,99 +40,137 @@ router.get("/", auth, async (req, res, next) => {
 });
 
 //
-// ✅ Get single case - normalize kycDocs + support documentSections (AUTH)
+// ✅ Get single case (auth)
 //
 router.get("/:id", auth, async (req, res, next) => {
   try {
     const item = await Case.findById(req.params.id)
       .populate("assignedTo", "name role")
       .populate("channelPartner", "name contact email");
-
     if (!item) return res.status(404).json({ message: "Case not found" });
 
-    const caseObj = item.toObject();
-
-    // Normalize legacy kycDocs
-    let normalized = {};
-    if (item.kycDocs instanceof Map) {
-      normalized = Object.fromEntries(item.kycDocs);
-    } else if (caseObj.kycDocs && typeof caseObj.kycDocs === "object") {
-      normalized = { ...caseObj.kycDocs };
-    }
-    Object.keys(normalized).forEach((k) => {
-      const val = normalized[k];
-      normalized[k] = Array.isArray(val) ? val : [val].filter(Boolean);
-    });
-    caseObj.kycDocs = normalized;
-
-    // Normalize new documentSections
-    if (caseObj.documentSections && Array.isArray(caseObj.documentSections)) {
-      caseObj.documentSections = caseObj.documentSections.map((section) => ({
-        ...section,
-        documents:
-          section.documents?.map((doc) => ({
-            ...doc,
-            files: doc.files || [],
-          })) || [],
-      }));
-    }
-
-    res.json(caseObj);
+    res.json(item);
   } catch (e) {
     next(e);
   }
 });
 
 //
-// 🔓 PUBLIC: Get single case (NO AUTH)
+// 🔓 Public GET
 //
 router.get("/:id/public", async (req, res, next) => {
   try {
     const item = await Case.findById(req.params.id);
     if (!item) return res.status(404).json({ message: "Case not found" });
-
-    const caseObj = item.toObject();
-
-    // Normalize legacy kycDocs
-    let normalized = {};
-    if (item.kycDocs instanceof Map) {
-      normalized = Object.fromEntries(item.kycDocs);
-    } else if (caseObj.kycDocs && typeof caseObj.kycDocs === "object") {
-      normalized = { ...caseObj.kycDocs };
-    }
-    Object.keys(normalized).forEach((k) => {
-      const val = normalized[k];
-      normalized[k] = Array.isArray(val) ? val : [val].filter(Boolean);
-    });
-    caseObj.kycDocs = normalized;
-
-    // Normalize new documentSections
-    if (caseObj.documentSections && Array.isArray(caseObj.documentSections)) {
-      caseObj.documentSections = caseObj.documentSections.map((section) => ({
-        ...section,
-        documents:
-          section.documents?.map((doc) => ({
-            ...doc,
-            files: doc.files || [],
-          })) || [],
-      }));
-    }
-
-    res.json(caseObj);
+    res.json(item);
   } catch (e) {
     next(e);
   }
 });
 
 //
-// ✅ Update case with safe handling for assignedTo + channelPartner (AUTH)
+// ✅ Update case (AUTH) with delete support
 //
-router.put("/:id", auth, upload.any(), async (req, res, next) => {
+router.put("/:id", auth, upload.array("documents"), async (req, res, next) => {
   try {
-    const prev = await Case.findById(req.params.id);
+    const { id } = req.params;
+    const prev = await Case.findById(id);
     if (!prev) return res.status(404).json({ message: "Case not found" });
 
     const body = req.body || {};
+    const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+
+    console.log(`📁 Processing ${uploadedFiles.length} uploaded files for case ${id}`);
+
+    // 🔹 1️⃣ Parse filesToDelete
+    let filesToDelete = [];
+    if (body.filesToDelete) {
+      try {
+        filesToDelete = JSON.parse(body.filesToDelete);
+        console.log(`🗑️ Received ${filesToDelete.length} files to delete`);
+      } catch (err) {
+        console.warn("⚠️ Invalid JSON in filesToDelete");
+      }
+    }
+
+    // 🔹 2️⃣ Remove those files from DB structure
+    if (filesToDelete.length > 0 && prev.documentSections?.length) {
+      prev.documentSections.forEach((section) => {
+        section.documents.forEach((doc) => {
+          doc.files = doc.files.filter((f) => {
+            if (!f.filename && !f.originalname) return true;
+
+            // ✅ Clean up filename & remove timestamp suffix like "-1759827991649"
+            const normalize = (name) =>
+              name
+                ? name
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[-_]\d{10,}\.(pdf|jpg|jpeg|png)$/i, ".$1")
+                : "";
+
+            const fileNameClean = normalize(f.filename || "");
+            const originalNameClean = normalize(f.originalname || "");
+
+            // ✅ Check if any deleted entry matches cleaned filename or original name
+            return !filesToDelete.some((del) => {
+              const delClean = normalize(del);
+              return (
+                delClean === fileNameClean ||
+                delClean === originalNameClean ||
+                (f._id && delClean === f._id.toString().toLowerCase())
+              );
+            });
+          });
+        });
+      });
+
+      // Physically delete from uploads folder
+      const uploadDir = path.join(process.cwd(), "server", "uploads");
+      filesToDelete.forEach((filename) => {
+        const filePath = path.join(uploadDir, filename);
+        if (fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+            console.log("🧹 Deleted file:", filename);
+          } catch (e) {
+            console.error("❌ Error deleting file:", filename, e.message);
+          }
+        }
+      });
+    }
+
+    // 🔹 3️⃣ Add new uploaded files
+    const newFileObjects = uploadedFiles.map((file) => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      path: file.path,
+      mimetype: file.mimetype,
+      size: file.size,
+      uploadDate: new Date(),
+      isUploaded: true,
+      isActive: true,
+      isDeleted: false,
+    }));
+
+    // Flatten existing files
+    const existingFiles = [];
+    if (prev.documentSections) {
+      prev.documentSections.forEach((s) => {
+        s.documents.forEach((d) => {
+          d.files.forEach((f) => {
+            if (!f.isDeleted && f.isActive !== false) existingFiles.push(f);
+          });
+        });
+      });
+    }
+
+    const allFiles = [...existingFiles];
+    newFileObjects.forEach((f) => {
+      const dup = allFiles.some((ef) => ef.filename === f.filename);
+      if (!dup) allFiles.push(f);
+    });
+
     const updateData = {
       customerName: body.customerName || body.name,
       mobile: body.mobile || body.primaryMobile,
@@ -148,12 +178,9 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       applicant2Name: body.applicant2Name,
       applicant2Mobile: body.applicant2Mobile,
       applicant2Email: body.applicant2Email,
-
       leadType: body.leadType,
       subType: body.subType,
-      loanType: body.loanType,
-      amount:
-        body.amount && body.amount !== "null" ? Number(body.amount) : undefined,
+      amount: body.amount ? Number(body.amount) : undefined,
       bank: body.bank,
       branch: body.branch,
       status: body.status,
@@ -164,189 +191,191 @@ router.put("/:id", auth, upload.any(), async (req, res, next) => {
       panNumber: body.panNumber,
       aadharNumber: body.aadharNumber,
       notes: body.notes,
-      disbursedAmount:
-        body.disbursedAmount && body.disbursedAmount !== "null"
-          ? Number(body.disbursedAmount)
-          : undefined,
-      task: body.task,
+      documentSections: [
+        {
+          id: "section-main-documents",
+          name: "Case Documents",
+          documents: [
+            { id: "doc-all-files", name: "All Uploaded Files", files: allFiles },
+          ],
+        },
+      ],
     };
 
-    // ✅ AssignedTo handling (Safe fallback)
-    let resolvedAssignedTo;
-    if ("assignedTo" in body) {
-      const raw = body.assignedTo;
-      if (!raw || raw === "null" || raw === "" || raw === "undefined") {
-        resolvedAssignedTo = null;
-      } else if (typeof raw === "object" && raw._id) {
-        resolvedAssignedTo = String(raw._id);
-      } else if (mongoose.Types.ObjectId.isValid(String(raw))) {
-        resolvedAssignedTo = String(raw);
-      } else {
-        console.warn("⚠️ Skipping invalid assignedTo:", raw);
+    // 🧩 Auto-restore default KYC structure when all files deleted
+    if (Array.isArray(updateData.documentSections)) {
+      const totalFiles = updateData.documentSections.reduce(
+        (sum, section) =>
+          sum +
+          (Array.isArray(section.documents)
+            ? section.documents.reduce(
+                (dSum, doc) => dSum + (Array.isArray(doc.files) ? doc.files.length : 0),
+                0
+              )
+            : 0),
+        0
+      );
+
+      if (totalFiles === 0) {
+        console.log("🔁 Restoring default KYC structure (backend)");
+
+        updateData.documentSections = [
+          {
+            id: "section-1",
+            name: "KYC Documents",
+            documents: [
+              { id: "doc-1-1", name: "Photo 4 each (A & C)", files: [] },
+              { id: "doc-1-2", name: "PAN Self attested - A & C", files: [] },
+              { id: "doc-1-3", name: "Aadhar - self attested - A & C", files: [] },
+              { id: "doc-1-4", name: "Address Proof (Resident & Shop/Company)", files: [] },
+              { id: "doc-1-5", name: "Shop Act/Company Registration/Company PAN", files: [] },
+              { id: "doc-1-6", name: "Bank statement last 12 months (CA and SA)", files: [] },
+              { id: "doc-1-7", name: "GST/Trade/Professional Certificate", files: [] },
+              { id: "doc-1-8", name: "Udyam Registration/Certificate", files: [] },
+              { id: "doc-1-9", name: "ITR last 3 years (Computation / P&L / Balance Sheet)", files: [] },
+              { id: "doc-1-10", name: "Marriage Certificate (if required)", files: [] },
+              { id: "doc-1-11", name: "Partnership Deed (if required)", files: [] },
+              { id: "doc-1-12", name: "MOA & AOA Company Registration", files: [] },
+              { id: "doc-1-13", name: "Form 26AS Last 3 Years", files: [] },
+            ],
+          },
+        ];
       }
     }
-    if (resolvedAssignedTo !== undefined) {
-      updateData.assignedTo = resolvedAssignedTo;
-    }
 
-    // ✅ ChannelPartner handling (Safe fallback)
-    let resolvedChannelPartner;
-    try {
-      const rawPartner = body.channelPartner;
-      if (
-        !rawPartner ||
-        rawPartner === "null" ||
-        rawPartner === "" ||
-        rawPartner === "undefined"
-      ) {
-        resolvedChannelPartner = null;
-      } else if (typeof rawPartner === "object" && rawPartner._id) {
-        resolvedChannelPartner = rawPartner._id;
-      } else if (mongoose.Types.ObjectId.isValid(String(rawPartner))) {
-        resolvedChannelPartner = String(rawPartner);
-      } else {
-        console.warn("⚠️ Skipping invalid channelPartner:", rawPartner);
-        resolvedChannelPartner = null;
-      }
-    } catch {
-      resolvedChannelPartner = null;
-    }
-    updateData.channelPartner = resolvedChannelPartner;
-
-    // 🔹 Handle documentSections...
-    let documentSections = [];
-    try {
-      let raw = body.documentSections;
-      if (typeof raw === "string") {
-        documentSections = JSON.parse(raw);
-      } else if (Array.isArray(raw)) {
-        documentSections = raw;
-      } else if (raw && typeof raw === "object") {
-        documentSections = [raw];
-      }
-
-      if (Array.isArray(documentSections)) {
-        const processedSections = documentSections.map(
-          (section, sectionIndex) => ({
-            id: section.id || `section-${sectionIndex}-${Date.now()}`,
-            name: section.name || "Untitled Section",
-            documents: (section.documents || []).map((doc, docIndex) => ({
-              id: doc.id || `doc-${sectionIndex}-${docIndex}-${Date.now()}`,
-              name: doc.name || "Untitled Document",
-              files: [...(doc.files || [])],
-            })),
-          })
-        );
-        updateData.documentSections = processedSections;
-        updateData.kycDocs = {};
-      }
-    } catch {
-      updateData.documentSections = [];
-      updateData.kycDocs = {};
-    }
-
-    const item = await Case.findByIdAndUpdate(req.params.id, updateData, {
+    const item = await Case.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
-    })
-      .populate("assignedTo", "name role")
-      .populate("channelPartner", "name contact email");
-
-    await CaseAudit.create({
-      case: item._id,
-      actor: req.user.id,
-      action: "updated",
     });
+
+    await CaseAudit.create({ case: item._id, actor: req.user.id, action: "updated" });
+
+    console.log(
+      `✅ Saved case ${id} - ${newFileObjects.length} new, ${filesToDelete.length} deleted, total ${allFiles.length}`
+    );
 
     res.json(item);
   } catch (e) {
+    console.error("❌ Case update error:", e);
     next(e);
   }
 });
 
 //
-// 🔓 PUBLIC: Update case (NO AUTH)
+// 🔓 Public update (NO AUTH)
 //
-router.put("/:id/public", upload.any(), async (req, res, next) => {
+router.put("/:id/public", upload.array("documents"), async (req, res, next) => {
   try {
-    const prev = await Case.findById(req.params.id);
+    const { id } = req.params;
+    const prev = await Case.findById(id);
     if (!prev) return res.status(404).json({ message: "Case not found" });
 
     const body = req.body || {};
-    const updateData = {
-      customerName: body.customerName || body.name,
-      mobile: body.mobile || body.primaryMobile,
-      email: body.email,
-      applicant2Name: body.applicant2Name,
-      applicant2Mobile: body.applicant2Mobile,
-      applicant2Email: body.applicant2Email,
-      leadType: body.leadType,
-      subType: body.subType,
-      loanType: body.loanType,
-      amount:
-        body.amount && body.amount !== "null" ? Number(body.amount) : undefined,
-      bank: body.bank,
-      branch: body.branch,
-      status: body.status,
-      permanentAddress: body.permanentAddress,
-      currentAddress: body.currentAddress,
-      siteAddress: body.siteAddress,
-      officeAddress: body.officeAddress,
-      panNumber: body.panNumber,
-      aadharNumber: body.aadharNumber,
-      notes: body.notes,
-      disbursedAmount:
-        body.disbursedAmount && body.disbursedAmount !== "null"
-          ? Number(body.disbursedAmount)
-          : undefined,
-      task: body.task,
-    };
+    const uploadedFiles = Array.isArray(req.files) ? req.files : [];
 
-    // 🔹 Handle documentSections
-    let documentSections = [];
-    try {
-      let raw = body.documentSections;
-      if (typeof raw === "string") {
-        documentSections = JSON.parse(raw);
-      } else if (Array.isArray(raw)) {
-        documentSections = raw;
-      } else if (raw && typeof raw === "object") {
-        documentSections = [raw];
-      }
-
-      if (Array.isArray(documentSections)) {
-        const processedSections = documentSections.map(
-          (section, sectionIndex) => ({
-            id: section.id || `section-${sectionIndex}-${Date.now()}`,
-            name: section.name || "Untitled Section",
-            documents: (section.documents || []).map((doc, docIndex) => ({
-              id: doc.id || `doc-${sectionIndex}-${docIndex}-${Date.now()}`,
-              name: doc.name || "Untitled Document",
-              files: [...(doc.files || [])],
-            })),
-          })
-        );
-        updateData.documentSections = processedSections;
-        updateData.kycDocs = {};
-      }
-    } catch {
-      updateData.documentSections = [];
-      updateData.kycDocs = {};
+    let filesToDelete = [];
+    if (body.filesToDelete) {
+      try {
+        filesToDelete = JSON.parse(body.filesToDelete);
+        console.log(`🗑️ PUBLIC delete count: ${filesToDelete.length}`);
+      } catch (err) {}
     }
 
-    const item = await Case.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    if (filesToDelete.length > 0 && prev.documentSections?.length) {
+      prev.documentSections.forEach((section) => {
+        section.documents.forEach((doc) => {
+          doc.files = doc.files.filter(
+            (f) => !filesToDelete.includes(f.filename)
+          );
+        });
+      });
+      const uploadDir = path.join(process.cwd(), "server", "uploads");
+      filesToDelete.forEach((filename) => {
+        const filePath = path.join(uploadDir, filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      });
+    }
 
-    await CaseAudit.create({
-      case: item._id,
-      actor: null,
-      action: "updated_public",
+    const newFiles = uploadedFiles.map((file) => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      path: file.path,
+      mimetype: file.mimetype,
+      size: file.size,
+      uploadDate: new Date(),
+      isUploaded: true,
+      isActive: true,
+      isDeleted: false,
+    }));
+
+    const allFiles = [];
+    prev.documentSections.forEach((s) => {
+      s.documents.forEach((d) => {
+        allFiles.push(...d.files);
+      });
     });
+    allFiles.push(...newFiles);
+
+    const updateData = {
+      ...body,
+      documentSections: [
+        {
+          id: "section-main-documents",
+          name: "Case Documents",
+          documents: [
+            { id: "doc-all-files", name: "All Uploaded Files", files: allFiles },
+          ],
+        },
+      ],
+    };
+
+    // 🧩 Auto-restore default KYC structure when all files deleted (Public)
+    if (Array.isArray(updateData.documentSections)) {
+      const totalFiles = updateData.documentSections.reduce(
+        (sum, section) =>
+          sum +
+          (Array.isArray(section.documents)
+            ? section.documents.reduce(
+                (dSum, doc) => dSum + (Array.isArray(doc.files) ? doc.files.length : 0),
+                0
+              )
+            : 0),
+        0
+      );
+
+      if (totalFiles === 0) {
+        console.log("🔁 Restoring default KYC structure (public backend)");
+
+        updateData.documentSections = [
+          {
+            id: "section-1",
+            name: "KYC Documents",
+            documents: [
+              { id: "doc-1-1", name: "Photo 4 each (A & C)", files: [] },
+              { id: "doc-1-2", name: "PAN Self attested - A & C", files: [] },
+              { id: "doc-1-3", name: "Aadhar - self attested - A & C", files: [] },
+              { id: "doc-1-4", name: "Address Proof (Resident & Shop/Company)", files: [] },
+              { id: "doc-1-5", name: "Shop Act/Company Registration/Company PAN", files: [] },
+              { id: "doc-1-6", name: "Bank statement last 12 months (CA and SA)", files: [] },
+              { id: "doc-1-7", name: "GST/Trade/Professional Certificate", files: [] },
+              { id: "doc-1-8", name: "Udyam Registration/Certificate", files: [] },
+              { id: "doc-1-9", name: "ITR last 3 years (Computation / P&L / Balance Sheet)", files: [] },
+              { id: "doc-1-10", name: "Marriage Certificate (if required)", files: [] },
+              { id: "doc-1-11", name: "Partnership Deed (if required)", files: [] },
+              { id: "doc-1-12", name: "MOA & AOA Company Registration", files: [] },
+              { id: "doc-1-13", name: "Form 26AS Last 3 Years", files: [] },
+            ],
+          },
+        ];
+      }
+    }
+
+    const item = await Case.findByIdAndUpdate(id, updateData, { new: true });
+    await CaseAudit.create({ case: item._id, actor: null, action: "updated" });
 
     res.json(item);
   } catch (e) {
+    console.error("❌ PUBLIC update error:", e);
     next(e);
   }
 });
@@ -363,74 +392,38 @@ router.get("/:id/download", auth, async (req, res, next) => {
       caseObj.customerName?.replace(/[^a-zA-Z0-9]/g, "_") ||
       caseObj.caseId ||
       "case_documents";
-    res.attachment(`${folderName}_documents.zip`);
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${folderName}_documents.zip"`
+    );
 
     const archive = archiver("zip", { zlib: { level: 9 } });
     archive.pipe(res);
 
-    let fileCount = 0;
-
-    // ✅ New structure
-    if (caseObj.documentSections && Array.isArray(caseObj.documentSections)) {
+    let count = 0;
+    const uploadDir = path.join(process.cwd(), "server", "uploads");
+    if (Array.isArray(caseObj.documentSections)) {
       for (const section of caseObj.documentSections) {
-        const sectionName =
-          section.name?.replace(/[^a-zA-Z0-9]/g, "_") || "Unnamed_Section";
         for (const doc of section.documents || []) {
-          const docName =
-            doc.name?.replace(/[^a-zA-Z0-9]/g, "_") || "Unnamed_Document";
           for (const file of doc.files || []) {
-            const filename = file.filename || file.name;
-            if (filename) {
-              const filePath = path.join(
-                process.cwd(),
-                "server",
-                "uploads",
-                filename
-              );
-              if (fs.existsSync(filePath)) {
-                archive.file(filePath, {
-                  name: `${sectionName}/${docName}/${filename}`,
-                });
-                fileCount++;
-              }
+            const filePath = path.join(uploadDir, file.filename);
+            if (fs.existsSync(filePath)) {
+              archive.file(filePath, {
+                name: `${section.name}/${doc.name}/${file.originalname || file.filename}`,
+              });
+              count++;
             }
           }
         }
       }
     }
 
-    // ✅ Legacy fallback
-    if (fileCount === 0 && caseObj.kycDocs) {
-      const kycDocs =
-        caseObj.kycDocs instanceof Map
-          ? Object.fromEntries(caseObj.kycDocs)
-          : caseObj.kycDocs || {};
-      Object.entries(kycDocs).forEach(([fieldName, files]) => {
-        const fileArray = Array.isArray(files) ? files : [files].filter(Boolean);
-        fileArray.forEach((file) => {
-          const filename = typeof file === "string" ? file : file.filename;
-          if (filename) {
-            const filePath = path.join(
-              process.cwd(),
-              "server",
-              "uploads",
-              filename
-            );
-            if (fs.existsSync(filePath)) {
-              archive.file(filePath, { name: `KYC_Documents/${filename}` });
-              fileCount++;
-            }
-          }
-        });
-      });
-    }
-
-    if (fileCount === 0) {
-      return res.status(404).json({ message: "No documents found to download" });
-    }
-
+    console.log(`📦 Archiving ${count} files for download`);
     archive.finalize();
   } catch (e) {
+    console.error("❌ ZIP error:", e);
     next(e);
   }
 });

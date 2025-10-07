@@ -60,15 +60,15 @@ export default function ViewLeadCase() {
   }, [id]);
 
   // -------- Progress Calculation --------
-  const progress = useMemo(() => {
+    const progress = useMemo(() => {
     if (!caseData) return 0;
 
     const required = [
       "leadId",
-      "customerName",
+      "customerName", 
       "mobile",
       "email",
-      "loanType",
+      "leadType", // ✅ CHANGED: from loanType to leadType
       "amount",
       "permanentAddress",
     ];
@@ -127,45 +127,45 @@ export default function ViewLeadCase() {
   };
 
   // -------- Document Stats --------
-  const getDocumentStats = () => {
-    if (!caseData) return { totalFiles: 0, totalSections: 0, fileDetails: [] };
-    let totalFiles = 0;
-    let fileDetails = [];
+ // In ViewLeadCase.jsx, update the getDocumentStats function:
 
-    if (caseData.documentSections && caseData.documentSections.length > 0) {
+// In ViewLeadCase.jsx - Update getDocumentStats to filter deleted files
+
+const getDocumentStats = () => {
+  if (!caseData) return { totalFiles: 0, totalSections: 0, fileDetails: [] };
+  
+  let totalFiles = 0;
+  let fileDetails = [];
+
+  // Count only active files from documentSections
+    if (caseData.documentSections && Array.isArray(caseData.documentSections)) {
       caseData.documentSections.forEach((section) => {
-        section.documents.forEach((doc) => {
-          if (doc.files && doc.files.length > 0) {
-            doc.files.forEach((file) => {
-              totalFiles++;
-              fileDetails.push({
-                section: section.name,
-                document: doc.name,
-                file: file,
-                url: getFileUrl(file),
+        if (section.documents && Array.isArray(section.documents)) {
+          section.documents.forEach((doc) => {
+            if (doc.files && Array.isArray(doc.files)) {
+              doc.files.forEach((file) => {
+                // ✅ Only count files that are not deleted
+                if (file && file.filename && !file.isDeleted && file.isActive !== false) {
+                  totalFiles++;
+                  fileDetails.push({
+                    section: section.name || "Documents",
+                    document: doc.name || "Files",
+                    file: file,
+                    url: getFileUrl(file),
+                  });
+                }
               });
-            });
-          }
-        });
-      });
-    } else if (caseData.kycDocs) {
-      Object.entries(caseData.kycDocs).forEach(([fieldName, files]) => {
-        const fileArray = Array.isArray(files) ? files : [files].filter(Boolean);
-        fileArray.forEach((file) => {
-          totalFiles++;
-          fileDetails.push({
-            section: "KYC Documents",
-            document: fieldName,
-            file: file,
-            url: getFileUrl(file),
+            }
           });
-        });
+        }
       });
     }
 
+    console.log(`📊 Found ${totalFiles} active files in case data`);
+
     return {
       totalFiles,
-      totalSections: caseData.documentSections?.length || 1,
+      totalSections: caseData.documentSections?.length || 0,
       fileDetails,
     };
   };
@@ -270,9 +270,10 @@ export default function ViewLeadCase() {
 
           <div className="progress-display">
             <div className="progress-stats">
-              <span className="progress-percentage">{progress}% Complete</span>
-              <span className="progress-pending">{100 - progress}% Pending</span>
-            </div>
+            <span className="progress-percentage">{progress}% Complete</span>
+            <span className="file-count-badge">{documentStats.totalFiles} Files</span>
+            <span className="progress-pending">{100 - progress}% Pending</span>
+          </div>
             <div className="progress-visual">
               <div className="progress-bar-wrapper">
                 <div
@@ -420,6 +421,62 @@ export default function ViewLeadCase() {
             <div className="info-row"><label>Aadhaar Number</label><span>{show(caseData.aadharNumber)}</span></div>
           </div>
         </div>
+
+                {/* Documents & KYC Uploads */}
+        <div className="info-card full-width">
+          <div className="card-header">
+            <FiPaperclip className="card-icon" />
+            <h3>Attached Documents</h3>
+            <button
+              className="btn secondary small"
+              onClick={handleDownload}
+              disabled={isDownloading}
+            >
+              {isDownloading
+                ? `Downloading... ${downloadProgress}%`
+                : "⬇ Download All"}
+            </button>
+          </div>
+
+          <div className="card-content">
+            {documentStats.totalFiles === 0 ? (
+              <p className="no-docs-text">No documents uploaded yet.</p>
+            ) : (
+              <div className="documents-list">
+                {documentStats.fileDetails.map((f, idx) => (
+                  <div key={idx} className="document-item">
+                    <div className="doc-info">
+                      <span className="doc-section">
+                        📂 {f.section} — {f.document}
+                      </span>
+                      <span className="doc-name">{f.file.filename || f.file.name}</span>
+                    </div>
+                    <div className="doc-actions">
+                      {f.url && (
+                        <a
+                          href={f.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn small view-btn"
+                        >
+                          View
+                        </a>
+                      )}
+                      <a
+                        href={f.url}
+                        download
+                        className="btn small download-btn"
+                      >
+                        Download
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
 
         {/* Notes */}
         <div className="info-card full-width">
