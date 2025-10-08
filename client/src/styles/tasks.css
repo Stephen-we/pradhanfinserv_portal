@@ -1,243 +1,137 @@
+/* tasks.css */
 .task-table-container {
-  max-width: 1600px;
-  margin: 30px auto;
-  background: #f9f9fb;
   padding: 20px;
-  border-radius: 8px;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .task-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .task-header h2 {
-  color: #1f2937;
-  font-size: 20px;
-  font-weight: bold;
+  color: #007bff; /* Blue color as before */
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .tasks-header-info {
-  background: #f5f5f5;
+  background: #f8f9fa;
   padding: 15px;
-  border-radius: 5px;
+  border-radius: 8px;
   margin-bottom: 20px;
-  border-left: 4px solid #2f4a80;
+  display: flex;
+  gap: 30px;
 }
 
 .tasks-header-info p {
-  margin: 5px 0;
-  color: #1f2937;
+  margin: 0;
   font-size: 14px;
 }
 
 .task-block {
-  margin-bottom: 25px;
-  padding: 0;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 
 .task-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
   table-layout: fixed;
 }
 
-.task-table thead {
-  background: #2f4a80;
-  color: white;
-}
-
-.task-table thead th {
-  padding: 15px 12px;
-  font-size: 14px;
-  font-weight: 600;
+.task-table th {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Beautiful gradient */
+  padding: 12px 8px;
   text-align: left;
-  vertical-align: middle;
-  border-bottom: 2px solid #1e3a6b;
+  font-weight: 600;
+  font-size: 12px;
+  color: white; /* White text for better contrast */
+  border-bottom: 2px solid #dee2e6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.task-table tbody td {
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 14px;
+.task-table td {
+  padding: 8px;
+  border-bottom: 1px solid #e9ecef;
   vertical-align: top;
 }
 
-.task-table tbody tr:nth-child(odd) {
-  background: #f9fafb;
+.task-row:hover {
+  background-color: #f8f9fa;
 }
 
-.task-table tbody tr:hover {
-  background: #eef2ff;
-}
+/* Column Widths */
+.sr-no-header { width: 60px; }
+.stage-header { width: 120px; }
+.task-name-header { width: 150px; }
+.case-owner-header { width: 130px; }
+.status-header { width: 120px; }
+.date-header { width: 120px; }
+.duration-header { width: 100px; }
+.notes-header { width: 200px; min-width: 150px; }
+.action-header { width: 80px; }
 
-.task-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Column widths */
-.sr-no-header {
-  width: 80px;
-  text-align: center;
-}
-
-.sr-no {
-  text-align: center;
-  vertical-align: middle;
-  font-weight: 600;
-  width: 80px;
-}
-
-.notes-header {
-  width: 300px; /* Wider notes column */
-}
-
-.notes-cell {
-  width: 300px;
-}
-
-/* Action column */
-.action-header {
-  width: 100px;
-  text-align: center;
-}
-
-.action-cell {
-  text-align: center;
-  vertical-align: middle;
-  width: 100px;
-}
-
-/* Other columns get auto width */
-.task-table th:not(.sr-no-header):not(.notes-header):not(.action-header) {
-  width: auto;
-}
-
-.task-table td:not(.sr-no):not(.notes-cell):not(.action-cell) {
-  width: auto;
-  min-width: 120px;
-}
-
-/* Input fields */
+/* Input and Select Styles */
 .task-table input,
 .task-table select,
 .task-table textarea {
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  border: 1px solid #ced4da;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   box-sizing: border-box;
-  font-family: inherit;
+  transition: border-color 0.15s ease-in-out;
 }
 
 .task-table input:focus,
 .task-table select:focus,
 .task-table textarea:focus {
   outline: none;
-  border-color: #2f4a80;
-  box-shadow: 0 0 0 2px rgba(47, 74, 128, 0.1);
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-/* Notes textarea - wider and taller */
-.notes-cell textarea {
+.notes-textarea {
   resize: vertical;
-  min-height: 80px;
+  min-height: 60px;
   font-family: inherit;
-  min-width: 100%;
-  max-width: 100%;
+  line-height: 1.4;
 }
 
-/* Status select */
 .status-select {
-  min-width: 120px;
+  background-color: white;
 }
 
-.status-select option {
-  padding: 8px;
-}
-
-.empty-table-message {
-  text-align: center;
-  padding: 40px;
-  color: #6b7280;
-  font-style: italic;
-  background: #f9fafb;
-}
-
-/* Delete Confirmation Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.delete-confirm-modal {
-  background: white;
-  padding: 30px;
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-}
-
-.delete-confirm-modal h3 {
-  margin: 0 0 15px 0;
-  color: #dc2626;
-  font-size: 20px;
-}
-
-.delete-confirm-modal p {
-  margin: 10px 0;
-  color: #1f2937;
-}
-
-.warning-text {
-  color: #dc2626 !important;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-.modal-actions .btn {
-  min-width: 120px;
-}
-
-/* Buttons */
+/* Button Styles */
 .btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 14px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
   text-decoration: none;
-  transition: all 0.2s;
-  font-family: inherit;
 }
 
 .btn.primary {
@@ -259,77 +153,116 @@
 }
 
 .btn.danger {
-  background: #dc2626;
+  background: #dc3545;
   color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  padding: 8px 16px;
 }
 
 .btn.danger:hover {
-  background: #b91c1c;
-  transform: scale(1.05);
+  background: #c82333;
 }
 
 .btn.small {
+  padding: 6px 8px;
   font-size: 12px;
-  padding: 6px 10px;
+  min-width: auto; /* Fix for broken button */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.no-results {
+/* Action cell specific fixes */
+.action-cell {
   text-align: center;
-  padding: 15px;
-  font-style: italic;
-  color: #6b7280;
-  background: white;
-  border-radius: 6px;
-  margin: 20px 0;
-}
-
-/* Ensure proper vertical alignment */
-.task-table th,
-.task-table td {
   vertical-align: middle;
 }
 
-/* Specific alignment for date inputs */
-.task-table input[type="date"] {
-  min-width: 120px;
+.action-cell .btn.small {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Responsive design */
-@media (max-width: 1600px) {
+/* Empty state */
+.empty-table-message {
+  text-align: center;
+  padding: 40px !important;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.sr-no {
+  text-align: center;
+  font-weight: 500;
+  color: #6c757d;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.delete-confirm-modal {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.delete-confirm-modal h3 {
+  margin: 0 0 12px 0;
+  color: #dc3545;
+}
+
+.warning-text {
+  color: #dc3545;
+  font-weight: 500;
+  margin: 10px 0;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
   .task-table-container {
-    margin: 20px;
-    padding: 15px;
+    padding: 10px;
   }
   
-  .notes-header,
-  .notes-cell {
-    width: 250px;
+  .task-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
   }
-}
-
-@media (max-width: 1400px) {
-  .notes-header,
-  .notes-cell {
-    width: 200px;
+  
+  .tasks-header-info {
+    flex-direction: column;
+    gap: 8px;
   }
-}
-
-@media (max-width: 1200px) {
+  
   .task-table {
-    font-size: 13px;
+    font-size: 12px;
   }
   
   .task-table th,
   .task-table td {
-    padding: 10px 8px;
-  }
-  
-  .notes-header,
-  .notes-cell {
-    width: 180px;
+    padding: 6px 4px;
   }
 }

@@ -135,7 +135,7 @@ export default function CaseTasks() {
 
       <header className="task-header">
         <h2>Task Workflow</h2>
-        <div>
+        <div className="header-actions">
           <button
             className="btn secondary"
             onClick={() => navigate(`/cases/${id}/view`)}
@@ -145,7 +145,6 @@ export default function CaseTasks() {
           <button
             className="btn primary"
             onClick={addTask}
-            style={{ marginLeft: "10px" }}
           >
             <FiPlus /> Add Task
           </button>
@@ -168,14 +167,14 @@ export default function CaseTasks() {
             <thead>
               <tr>
                 <th className="sr-no-header">Sr No</th>
-                <th>Stage</th>
-                <th>Task Name</th>
-                <th>Case Owner</th>
-                <th>Status</th>
-                <th>Start Date</th>
-                <th>Planned End Date</th>
-                <th>Duration</th>
-                <th>Actual End Date</th>
+                <th className="stage-header">Stage</th>
+                <th className="task-name-header">Task Name</th>
+                <th className="case-owner-header">Case Owner</th>
+                <th className="status-header">Status</th>
+                <th className="date-header">Start Date</th>
+                <th className="date-header">Planned End Date</th>
+                <th className="duration-header">Duration</th>
+                <th className="date-header">Actual End Date</th>
                 <th className="notes-header">Notes</th>
                 <th className="action-header">Action</th>
               </tr>
@@ -191,7 +190,7 @@ export default function CaseTasks() {
                 tasks.map((task, idx) => (
                   <tr key={task._id} className="task-row">
                     <td className="sr-no">{idx + 1}</td>
-                    <td>
+                    <td className="stage-cell">
                       <input
                         value={task.stage || ""}
                         onChange={(e) =>
@@ -200,7 +199,7 @@ export default function CaseTasks() {
                         placeholder="Enter stage"
                       />
                     </td>
-                    <td>
+                    <td className="task-name-cell">
                       <input
                         value={task.taskName || ""}
                         onChange={(e) =>
@@ -209,7 +208,7 @@ export default function CaseTasks() {
                         placeholder="Enter task name"
                       />
                     </td>
-                    <td>
+                    <td className="case-owner-cell">
                       <input
                         value={task.caseOwner || ""}
                         onChange={(e) =>
@@ -218,7 +217,7 @@ export default function CaseTasks() {
                         placeholder="Enter case owner"
                       />
                     </td>
-                    <td>
+                    <td className="status-cell">
                       <select
                         value={task.taskStatus || "Pending"}
                         onChange={(e) =>
@@ -231,7 +230,7 @@ export default function CaseTasks() {
                         <option value="Completed">Completed</option>
                       </select>
                     </td>
-                    <td>
+                    <td className="date-cell">
                       <input
                         type="date"
                         value={toYMD(task.startDate)}
@@ -240,7 +239,7 @@ export default function CaseTasks() {
                         }
                       />
                     </td>
-                    <td>
+                    <td className="date-cell">
                       <input
                         type="date"
                         value={toYMD(task.plannedEndDate)}
@@ -249,7 +248,7 @@ export default function CaseTasks() {
                         }
                       />
                     </td>
-                    <td>
+                    <td className="duration-cell">
                       <input
                         value={task.duration || ""}
                         onChange={(e) =>
@@ -258,7 +257,7 @@ export default function CaseTasks() {
                         placeholder="e.g., 5 days"
                       />
                     </td>
-                    <td>
+                    <td className="date-cell">
                       <input
                         type="date"
                         value={toYMD(task.actualEndDate)}
@@ -274,7 +273,8 @@ export default function CaseTasks() {
                           handleChange(task._id, "notes", e.target.value)
                         }
                         placeholder="Enter notes"
-                        rows="3"
+                        rows="2"
+                        className="notes-textarea"
                       />
                     </td>
                     <td className="action-cell">
