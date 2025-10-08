@@ -392,18 +392,21 @@ router.put("/:id/public", upload.array("documents"), async (req, res, next) => {
 });
 
 //
-// ✅ Download all documents as ZIP
+//
+// ✅ Download all documents as ZIP (Stable Version)
 //
 router.get("/:id/download", auth, async (req, res, next) => {
   try {
     const caseObj = await Case.findById(req.params.id);
     if (!caseObj) return res.status(404).json({ message: "Case not found" });
 
+    // ✅ Safe, readable folder name
     const folderName =
       caseObj.customerName?.replace(/[^a-zA-Z0-9]/g, "_") ||
       caseObj.caseId ||
       "case_documents";
 
+    // ✅ Set headers
     res.setHeader("Content-Type", "application/zip");
     res.setHeader(
       "Content-Disposition",
@@ -411,32 +414,69 @@ router.get("/:id/download", auth, async (req, res, next) => {
     );
 
     const archive = archiver("zip", { zlib: { level: 9 } });
+
+    archive.on("warning", (err) => {
+      if (err.code === "ENOENT") console.warn("⚠️ ZIP Warning:", err.message);
+      else throw err;
+    });
+    archive.on("error", (err) => {
+      console.error("❌ ZIP stream error:", err.message);
+      res.status(500).json({ message: "Error creating ZIP file", error: err.message });
+    });
+
     archive.pipe(res);
 
-    let count = 0;
-    const uploadDir = path.join(process.cwd(), "server", "uploads");
+    // ✅ Try both upload directories
+    const uploadDirs = [
+      path.join(process.cwd(), "server", "uploads"),
+      path.join(process.cwd(), "uploads"),
+      path.join(process.cwd(), "src", "uploads"),
+    ];
+
+    let added = 0;
+
+    // ✅ Loop through all sections & files
     if (Array.isArray(caseObj.documentSections)) {
       for (const section of caseObj.documentSections) {
         for (const doc of section.documents || []) {
           for (const file of doc.files || []) {
-            const filePath = path.join(uploadDir, file.filename);
-            if (fs.existsSync(filePath)) {
-              archive.file(filePath, {
-                name: `${section.name}/${doc.name}/${file.originalname || file.filename}`,
-              });
-              count++;
+            if (!file || file.isDeleted || file.isActive === false) continue;
+
+            const filename = file.filename || path.basename(file.path || "");
+            if (!filename) continue;
+
+            // find file in any valid dir
+            let filePath = null;
+            for (const dir of uploadDirs) {
+              const tryPath = path.join(dir, filename);
+              if (fs.existsSync(tryPath)) {
+                filePath = tryPath;
+                break;
+              }
+            }
+
+            if (filePath) {
+              const zipPath = `${section.name || "Section"}/${doc.name || "Document"}/${file.originalname || filename}`;
+              archive.file(filePath, { name: zipPath });
+              added++;
             }
           }
         }
       }
     }
 
-    console.log(`📦 Archiving ${count} files for download`);
-    archive.finalize();
+    if (added === 0) {
+      console.warn("⚠️ No files found for ZIP archive");
+    } else {
+      console.log(`📦 Added ${added} files to ZIP for case ${caseObj.caseId}`);
+    }
+
+    await archive.finalize();
   } catch (e) {
     console.error("❌ ZIP error:", e);
     next(e);
   }
 });
+
 
 export default router;

@@ -2,7 +2,10 @@
 import mongoose from "mongoose";
 
 const CaseSchema = new mongoose.Schema(
+  
   {
+    requirementAmount: { type: Number }, // comes from Lead at conversion time
+
     caseId: { type: String, unique: true },
     leadId: { type: String },
 

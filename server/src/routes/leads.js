@@ -158,33 +158,38 @@ router.patch(
         let chosenLoanType = lead.subType;
         if (!validLoanTypes.includes(chosenLoanType)) chosenLoanType = "Home Loan";
 
-        caseDoc = await Case.create({
-          caseId: lead.leadId,           // same id as lead
-          leadId: lead.leadId,
+       caseDoc = await Case.create({
+        caseId: lead.leadId,
+        leadId: lead.leadId,
 
-          // NEW
-          leadType: lead.leadType,
-          subType: lead.subType,
+        // keep these
+        leadType: lead.leadType,
+        subType: lead.subType,
+        channelPartner: lead.channelPartner?._id || lead.channelPartner,
+        loanType: chosenLoanType,
+        status: "Pending",
 
-          // ✅ ADD THIS: Transfer channel partner
-          channelPartner: lead.channelPartner?._id || lead.channelPartner,
+        // ✅ requirement from Lead (Free Pool)
+        requirementAmount: lead.requirementAmount ?? null,
 
-          loanType: chosenLoanType,
-          status: "Pending",
-          amount: lead.requirementAmount,
-          bank: lead.bank || "",
-          branch: lead.branch,
-          customerName: lead.name,
-          mobile: lead.mobile,
-          email: lead.email,
-          permanentAddress: lead.permanentAddress,
-          currentAddress: lead.currentAddress,
-          siteAddress: lead.siteAddress,
-          officeAddress: lead.officeAddress,
-          panNumber: lead.pan,           // ✅ FIXED: should be panNumber
-          aadharNumber: lead.aadhar,     // ✅ FIXED: should be aadharNumber
-          notes: lead.notes || "",
-        });
+        // ✅ sanctioned stays manual (empty initially)
+        amount: null,
+
+        bank: lead.bank || "",
+        branch: lead.branch,
+        customerName: lead.name,
+        mobile: lead.mobile,
+        email: lead.email,
+        permanentAddress: lead.permanentAddress,
+        currentAddress: lead.currentAddress,
+        siteAddress: lead.siteAddress,
+        officeAddress: lead.officeAddress,
+        panNumber: lead.pan,
+        aadharNumber: lead.aadhar,
+        notes: lead.notes || "",
+      });
+
+
       }
 
       // ✅ CUSTOMER: reuse if already created

@@ -48,19 +48,18 @@ export default function Cases() {
   }, [state.page, state.q, state.filterAssigned, state.filterTask, isLoading]);
 
   // 🔹 Load users for assignment + filter
-  const loadUsers = async () => {
-    try {
-      const res = await API.get("/users", { params: { active: true } });
-      const data = res.data;
-      const users = Array.isArray(data) ? data : data.items || [];
-      setState((s) => ({ ...s, users }));
-    } catch {
-      const res = await API.get("/users");
-      const data = res.data;
-      const users = Array.isArray(data) ? data : data.items || [];
-      setState((s) => ({ ...s, users }));
-    }
-  };
+    const loadUsers = async () => {
+      try {
+        const res = await API.get("/users");
+        const data = res.data;
+        const users = Array.isArray(data) ? data : data.items || [];
+        setState((s) => ({ ...s, users }));
+      } catch (err) {
+        console.error("User load failed:", err);
+        alert("Failed to load users");
+      }
+    };
+
 
   // ✅ Optimized useEffect with proper dependencies
   useEffect(() => {

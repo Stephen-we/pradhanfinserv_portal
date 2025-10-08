@@ -322,13 +322,19 @@ const getDocumentStats = () => {
             </div>
             <div className="info-row">
               <label>Requirement Amount</label>
-              <span className="amount-value">₹{show(caseData.requirementAmount || caseData.amount)}</span>
+              <span className="amount-value">
+                {caseData.requirementAmount != null
+                  ? `₹${caseData.requirementAmount}`
+                  : "-"}
+              </span>
             </div>
 
             <div className="info-row">
               <label>Sanctioned Amount</label>
               <span className="amount-value">
-                {caseData.amount && caseData.amount > 0 ? `₹${caseData.amount}` : "-"}
+                {caseData.amount != null && caseData.amount !== ""
+                  ? `₹${caseData.amount}`
+                  : "-"}
               </span>
             </div>
 
