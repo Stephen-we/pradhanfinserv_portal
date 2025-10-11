@@ -1,4 +1,3 @@
-// server/src/routes/leads.js
 import express from "express";
 import Lead from "../models/Lead.js";
 import Case from "../models/Case.js";
@@ -10,13 +9,12 @@ import { listWithPagination } from "../utils/paginate.js";
 const router = express.Router();
 
 /* ================================
-   ✅ Debug Route (for testing only)
+   ✅ Debug Route
 ================================ */
 router.get("/test", (req, res) => res.json({ ok: true }));
 
 /* ================================
    ✅ LIST Leads (with pagination & filters)
-   Example: GET /api/leads?page=1&q=&status=free_pool
 ================================ */
 router.get("/", auth, async (req, res, next) => {
   try {
@@ -60,7 +58,7 @@ router.post("/", auth, async (req, res, next) => {
 });
 
 /* ================================
-   ✅ GET Single Lead (with population)
+   ✅ GET Single Lead
 ================================ */
 router.get("/:id", auth, async (req, res, next) => {
   try {
@@ -76,7 +74,7 @@ router.get("/:id", auth, async (req, res, next) => {
 });
 
 /* ================================
-   ✅ UPDATE Lead (Full)
+   ✅ UPDATE Lead (PUT)
 ================================ */
 router.put("/:id", auth, async (req, res, next) => {
   try {
@@ -122,9 +120,6 @@ router.delete("/:id", auth, async (req, res, next) => {
 
 /* ================================
    ✅ CONVERT Lead → Archived + Case + Customer
-   - Uses the SAME ID: customerId = lead.leadId
-   - Saves channelPartner/bank/branch/status for Customer
-   - Idempotent (won't create duplicates if re-run)
 ================================ */
 router.patch(
   "/:id/convert",
@@ -135,16 +130,15 @@ router.patch(
       const lead = await Lead.findById(req.params.id).populate("channelPartner");
       if (!lead) return res.status(404).json({ message: "Lead not found" });
 
-      // Always archive the lead
+      // ✅ Archive lead if not already
       if (lead.status !== "archived") {
         lead.status = "archived";
         await lead.save();
       }
 
-      // ✅ CASE: reuse if already created
+      // ✅ CASE: reuse or create
       let caseDoc = await Case.findOne({ leadId: lead.leadId });
       if (!caseDoc) {
-        // Ensure valid loan type
         const validLoanTypes = [
           "Home Loan",
           "Personal Loan",
@@ -158,68 +152,65 @@ router.patch(
         let chosenLoanType = lead.subType;
         if (!validLoanTypes.includes(chosenLoanType)) chosenLoanType = "Home Loan";
 
-       caseDoc = await Case.create({
-        caseId: lead.leadId,
-        leadId: lead.leadId,
-
-        // keep these
-        leadType: lead.leadType,
-        subType: lead.subType,
-        channelPartner: lead.channelPartner?._id || lead.channelPartner,
-        loanType: chosenLoanType,
-        status: "Pending",
-
-        // ✅ requirement from Lead (Free Pool)
-        requirementAmount: lead.requirementAmount ?? null,
-
-        // ✅ sanctioned stays manual (empty initially)
-        amount: null,
-
-        bank: lead.bank || "",
-        branch: lead.branch,
-        customerName: lead.name,
-        mobile: lead.mobile,
-        email: lead.email,
-        permanentAddress: lead.permanentAddress,
-        currentAddress: lead.currentAddress,
-        siteAddress: lead.siteAddress,
-        officeAddress: lead.officeAddress,
-        panNumber: lead.pan,
-        aadharNumber: lead.aadhar,
-        notes: lead.notes || "",
-      });
-
-
+        caseDoc = await Case.create({
+          caseId: lead.leadId,
+          leadId: lead.leadId,
+          leadType: lead.leadType,
+          subType: lead.subType,
+          channelPartner: lead.channelPartner?._id || lead.channelPartner,
+          loanType: chosenLoanType,
+          status: "Pending",
+          requirementAmount: lead.requirementAmount ?? null,
+          amount: null, // sanctioned left empty initially
+          bank: lead.bank || "",
+          branch: lead.branch,
+          customerName: lead.name,
+          mobile: lead.mobile,
+          email: lead.email,
+          permanentAddress: lead.permanentAddress,
+          currentAddress: lead.currentAddress,
+          siteAddress: lead.siteAddress,
+          officeAddress: lead.officeAddress,
+          panNumber: lead.pan,
+          aadharNumber: lead.aadhar,
+          notes: lead.notes || "",
+        });
       }
 
-      // ✅ CUSTOMER: reuse if already created
+      // ✅ CUSTOMER: reuse or create
       let customerDoc = await Customer.findOne({ customerId: lead.leadId });
       if (!customerDoc) {
         customerDoc = await Customer.create({
           customerId: lead.leadId,
+          leadId: lead._id, // ✅ Link the original lead
           name: lead.name,
+          dob: lead.dob,
           mobile: lead.mobile,
           email: lead.email,
-
           channelPartner: lead.channelPartner?.name || "",
           bankName: lead.bank || "",
           branch: lead.branch || "",
           status: "open",
-
           kyc: {
             pan: lead.pan || "",
             aadhar: lead.aadhar || "",
             files: [],
           },
-
           address: {
             permanent: { line1: lead.permanentAddress || "" },
             correspondence: { line1: lead.currentAddress || "" },
           },
-
-          logNotes: lead.notes || "",
+          notes: lead.notes || "",
         });
+      } else {
+        // ✅ Update missing link for existing customer
+        if (!customerDoc.leadId) {
+          customerDoc.leadId = lead._id;
+          await customerDoc.save();
+        }
       }
+
+      console.log("✅ Customer linked to Lead:", customerDoc.leadId);
 
       return res.json({
         message: "Lead converted successfully",
@@ -228,12 +219,12 @@ router.patch(
         customer: customerDoc,
         caseId: caseDoc.caseId,
         customerId: customerDoc.customerId,
+        leadId: lead._id,
       });
     } catch (e) {
       next(e);
     }
   }
 );
-
 
 export default router;

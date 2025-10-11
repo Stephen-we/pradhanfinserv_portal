@@ -10,29 +10,57 @@ export default function ViewCustomer() {
   const navigate = useNavigate();
 
   const [customer, setCustomer] = useState(null);
+  const [lead, setLead] = useState(null);
+  const [caseData, setCaseData] = useState(null); // ✅ new
   const [disbursements, setDisbursements] = useState([]);
   const [showDetails, setShowDetails] = useState(false);
 
-  // 📝 Notes (customer-level) — autosave
   const [noteText, setNoteText] = useState("");
-  const [saveStatus, setSaveStatus] = useState(""); // '', 'saving', 'saved', 'error'
+  const [saveStatus, setSaveStatus] = useState("");
   const noteTimeout = useRef(null);
 
-  // Cleanup debounce
   useEffect(() => {
     return () => {
       if (noteTimeout.current) clearTimeout(noteTimeout.current);
     };
   }, []);
 
+  useEffect(() => {
+    loadCustomer();
+  }, [id]);
+
   const loadCustomer = async () => {
     try {
       const { data } = await API.get(`/customers/${id}`);
       setCustomer(data);
-      setNoteText(data.notes || ""); // if your backend uses logNotes, switch to data.logNotes
+      setNoteText(data.notes || "");
+      if (data.leadId) loadLead(data.leadId);
+      if (data.customerId) loadCase(data.customerId); // ✅ new
+      loadDisbursements(data._id);
     } catch (err) {
       console.error("❌ Failed to load customer:", err);
       alert("Unable to load customer details");
+    }
+  };
+
+  const loadLead = async (leadId) => {
+    try {
+      const { data } = await API.get(`/leads/${leadId}`);
+      setLead(data);
+    } catch (err) {
+      console.error("❌ Failed to load lead:", err);
+    }
+  };
+
+  // ✅ Fetch Case where case.leadId matches customer.customerId
+  const loadCase = async (customerId) => {
+    try {
+      const { data } = await API.get(`/cases`, { params: { q: customerId } });
+      if (data?.items?.length > 0) {
+        setCaseData(data.items[0]);
+      }
+    } catch (err) {
+      console.error("❌ Failed to load case:", err);
     }
   };
 
@@ -40,15 +68,10 @@ export default function ViewCustomer() {
     try {
       const { data } = await API.get(`/customers/${id}/disbursements`);
       setDisbursements(Array.isArray(data) ? data : []);
-    } catch (err) {
+    } catch {
       setDisbursements([]);
     }
   };
-
-  useEffect(() => {
-    loadCustomer();
-    loadDisbursements();
-  }, [id]);
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -64,7 +87,6 @@ export default function ViewCustomer() {
     loadCustomer();
   };
 
-  // Build safe PUT body if PATCH is rejected by server
   const buildPutPayload = (value) => {
     if (!customer) return { notes: value };
     const { _id, createdAt, updatedAt, __v, ...rest } = customer;
@@ -156,28 +178,35 @@ export default function ViewCustomer() {
           {showDetails && (
             <div className="detail-card collapsible-card">
               <div className="grid-2">
-                <div className="detail-item"><label>Lead Type:</label><span>{customer.leadType || "N/A"}</span></div>
-                <div className="detail-item"><label>Sub Type:</label><span>{customer.subType || "N/A"}</span></div>
+                <div className="detail-item"><label>Lead Type:</label><span>{lead?.leadType || "N/A"}</span></div>
+                <div className="detail-item"><label>Sub Type:</label><span>{lead?.subType || "N/A"}</span></div>
                 <div className="detail-item">
                   <label>Date of Birth:</label>
-                  <span>{customer.dob ? new Date(customer.dob).toLocaleDateString("en-IN") : "N/A"}</span>
+                  <span>{lead?.dob ? new Date(lead.dob).toLocaleDateString("en-IN") : "N/A"}</span>
                 </div>
                 <div className="detail-item">
                   <label>Requirement Amount:</label>
-                  <span>{customer.requirementAmount ? `₹${customer.requirementAmount.toLocaleString()}` : "N/A"}</span>
+                  <span>{lead?.requirementAmount ? `₹${lead.requirementAmount.toLocaleString()}` : "N/A"}</span>
                 </div>
+
+                {/* ✅ Sanctioned Amount from Case */}
                 <div className="detail-item">
                   <label>Sanctioned Amount:</label>
-                  <span>{customer.sanctionedAmount ? `₹${customer.sanctionedAmount.toLocaleString()}` : "N/A"}</span>
+                  <span>
+                    {caseData?.amount
+                      ? `₹${caseData.amount.toLocaleString()}`
+                      : "N/A"}
+                  </span>
                 </div>
-                <div className="detail-item"><label>Bank:</label><span>{customer.bankName || "N/A"}</span></div>
-                <div className="detail-item"><label>Branch:</label><span>{customer.branch || "N/A"}</span></div>
+
+                <div className="detail-item"><label>Bank:</label><span>{lead?.bank || customer.bankName || "N/A"}</span></div>
+                <div className="detail-item"><label>Branch:</label><span>{lead?.branch || customer.branch || "N/A"}</span></div>
                 <div className="detail-item">
                   <label>Channel Partner:</label>
-                  <span>{customer.channelPartner?.name || customer.channelPartner || "N/A"}</span>
+                  <span>{lead?.channelPartner?.name || customer.channelPartner || "N/A"}</span>
                 </div>
-                <div className="detail-item"><label>Permanent Address:</label><span>{customer.permanentAddress || "N/A"}</span></div>
-                <div className="detail-item"><label>Current Address:</label><span>{customer.currentAddress || "N/A"}</span></div>
+                <div className="detail-item"><label>Permanent Address:</label><span>{lead?.permanentAddress || "N/A"}</span></div>
+                <div className="detail-item"><label>Current Address:</label><span>{lead?.currentAddress || "N/A"}</span></div>
               </div>
             </div>
           )}
@@ -185,7 +214,6 @@ export default function ViewCustomer() {
 
         {/* Right-side Details */}
         <div className="profile-details">
-          {/* Status card */}
           <div className="detail-card">
             <h4>Status</h4>
             <p className={isCustomerClosed ? "status-close" : "status-open"}>
@@ -194,7 +222,7 @@ export default function ViewCustomer() {
             </p>
           </div>
 
-          {/* 💰 Disbursed Amount (read-only, show Date • Amount • Notes) */}
+          {/* 💰 Disbursed Amount */}
           <div className="detail-card disbursement-card">
             <h4>Disbursed Amount</h4>
             {sortedDisbursements.length > 0 && (
@@ -216,7 +244,7 @@ export default function ViewCustomer() {
             )}
           </div>
 
-          {/* Customer Notes (editable with autosave) */}
+          {/* Notes */}
           <div className="detail-card editable-notes">
             <div className="notes-header">
               <h4>Notes</h4>

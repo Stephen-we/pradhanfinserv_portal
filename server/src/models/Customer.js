@@ -24,6 +24,8 @@ const CustomerSchema = new mongoose.Schema(
   {
     // IDs
     customerId: { type: String, unique: true, required: true },
+    leadId: { type: mongoose.Schema.Types.ObjectId, ref: "Lead" },
+
 
     // Basics
     name: { type: String, required: true },
