@@ -1,27 +1,37 @@
 // client/src/pages/ViewCustomer.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FiEdit, FiX, FiTrash2, FiPlus } from "react-icons/fi";
+import { FiEdit, FiX } from "react-icons/fi";
 import API from "../services/api";
 import "../styles/viewCustomer.css";
 
 export default function ViewCustomer() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [customer, setCustomer] = useState(null);
   const [disbursements, setDisbursements] = useState([]);
-  const [showDisbursementForm, setShowDisbursementForm] = useState(false);
-  const [newDisbursement, setNewDisbursement] = useState({
-    amount: "",
-    date: new Date().toISOString().split("T")[0],
-    notes: "",
-  });
+  const [showDetails, setShowDetails] = useState(false);
+
+  // 📝 Notes (customer-level) — autosave
+  const [noteText, setNoteText] = useState("");
+  const [saveStatus, setSaveStatus] = useState(""); // '', 'saving', 'saved', 'error'
+  const noteTimeout = useRef(null);
+
+  // Cleanup debounce
+  useEffect(() => {
+    return () => {
+      if (noteTimeout.current) clearTimeout(noteTimeout.current);
+    };
+  }, []);
 
   const loadCustomer = async () => {
     try {
       const { data } = await API.get(`/customers/${id}`);
       setCustomer(data);
-    } catch (e) {
+      setNoteText(data.notes || ""); // if your backend uses logNotes, switch to data.logNotes
+    } catch (err) {
+      console.error("❌ Failed to load customer:", err);
       alert("Unable to load customer details");
     }
   };
@@ -29,8 +39,8 @@ export default function ViewCustomer() {
   const loadDisbursements = async () => {
     try {
       const { data } = await API.get(`/customers/${id}/disbursements`);
-      setDisbursements(data);
-    } catch (e) {
+      setDisbursements(Array.isArray(data) ? data : []);
+    } catch (err) {
       setDisbursements([]);
     }
   };
@@ -43,7 +53,6 @@ export default function ViewCustomer() {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const fd = new FormData();
     fd.append("photo", file);
     await API.post(`/customers/${id}/photo`, fd);
@@ -55,87 +64,66 @@ export default function ViewCustomer() {
     loadCustomer();
   };
 
-  const handleDisbursementChange = (e) => {
-    setNewDisbursement({
-      ...newDisbursement,
-      [e.target.name]: e.target.value,
-    });
+  // Build safe PUT body if PATCH is rejected by server
+  const buildPutPayload = (value) => {
+    if (!customer) return { notes: value };
+    const { _id, createdAt, updatedAt, __v, ...rest } = customer;
+    return { ...rest, notes: value };
   };
 
-  const addDisbursement = async (e) => {
-    e.preventDefault();
-    if (!newDisbursement.amount) {
-      alert("Please enter disbursement amount");
-      return;
-    }
-
+  const saveNotes = async (value) => {
     try {
-      await API.post(`/customers/${id}/disbursements`, {
-        ...newDisbursement,
-        amount: parseFloat(newDisbursement.amount),
-      });
-
-      setNewDisbursement({
-        amount: "",
-        date: new Date().toISOString().split("T")[0],
-        notes: "",
-      });
-      setShowDisbursementForm(false);
-      loadDisbursements();
-      loadCustomer(); // Refresh to update total disbursed and status
-      alert("✅ Disbursement added successfully!");
-    } catch (error) {
-      alert("❌ Failed to add disbursement");
+      await API.patch(`/customers/${id}`, { notes: value });
+      return true;
+    } catch (err) {
+      try {
+        await API.put(`/customers/${id}`, buildPutPayload(value));
+        return true;
+      } catch (err2) {
+        console.error("PUT /customers/:id failed:", err2?.response?.data || err2?.message);
+        return false;
+      }
     }
   };
 
-  const deleteDisbursement = async (disbursementId) => {
-    if (!window.confirm("Are you sure you want to delete this disbursement?")) {
-      return;
-    }
+  const handleNoteChange = (e) => {
+    const value = e.target.value;
+    setNoteText(value);
+    setSaveStatus("saving");
 
-    try {
-      await API.delete(`/customers/${id}/disbursements/${disbursementId}`);
-      loadDisbursements();
-      loadCustomer();
-      alert("✅ Disbursement deleted successfully!");
-    } catch (error) {
-      alert("❌ Failed to delete disbursement");
-    }
+    if (noteTimeout.current) clearTimeout(noteTimeout.current);
+    noteTimeout.current = setTimeout(async () => {
+      const ok = await saveNotes(value);
+      setSaveStatus(ok ? "saved" : "error");
+      if (ok) setCustomer((prev) => (prev ? { ...prev, notes: value } : prev));
+      setTimeout(() => setSaveStatus(""), 1500);
+    }, 1000);
   };
 
   if (!customer) return <div className="customer-profile">Loading...</div>;
 
-  const totalDisbursed = disbursements.reduce((sum, d) => sum + d.amount, 0);
   const isCustomerClosed = customer.status === "close";
+  const sortedDisbursements = [...disbursements].sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
+  );
 
   return (
     <div className="customer-profile">
       {/* Header */}
       <div className="profile-header">
         <h2>Customer Profile</h2>
-        <button
-          className="icon-btn"
-          onClick={() => navigate(`/customers/${id}/edit`)}
-        >
+        <button className="icon-btn" onClick={() => navigate(`/customers/${id}/edit`)}>
           <FiEdit size={20} />
         </button>
       </div>
 
-      {/* Grid Layout */}
       <div className="profile-grid">
         {/* Sidebar */}
-        <div
-          className="profile-sidebar"
-          style={{ height: "fit-content", minHeight: "400px" }}
-        >
+        <div className="profile-sidebar" style={{ height: "fit-content", minHeight: "400px" }}>
           <label className="avatar">
             {customer.photo ? (
               <>
-                <img
-                  src={`http://localhost:5000${customer.photo}`}
-                  alt="Profile"
-                />
+                <img src={`http://localhost:5000${customer.photo}`} alt="Profile" />
                 <button
                   className="remove-photo-btn"
                   onClick={(e) => {
@@ -150,12 +138,7 @@ export default function ViewCustomer() {
             ) : (
               <span style={{ fontSize: "12px", color: "#666" }}>No Photo</span>
             )}
-            <input
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={handlePhotoUpload}
-            />
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoUpload} />
           </label>
 
           <h3 style={{ marginTop: "15px" }}>{customer.name}</h3>
@@ -164,20 +147,45 @@ export default function ViewCustomer() {
           <div>{customer.email}</div>
         </div>
 
-        {/* Details */}
+        {/* Collapsible Profile Details */}
+        <div className="collapsible-wrapper">
+          <div className="collapsible-toggle" onClick={() => setShowDetails(!showDetails)}>
+            <h4>{showDetails ? "▼ Hide" : "▶ Show"} Profile Details</h4>
+          </div>
+
+          {showDetails && (
+            <div className="detail-card collapsible-card">
+              <div className="grid-2">
+                <div className="detail-item"><label>Lead Type:</label><span>{customer.leadType || "N/A"}</span></div>
+                <div className="detail-item"><label>Sub Type:</label><span>{customer.subType || "N/A"}</span></div>
+                <div className="detail-item">
+                  <label>Date of Birth:</label>
+                  <span>{customer.dob ? new Date(customer.dob).toLocaleDateString("en-IN") : "N/A"}</span>
+                </div>
+                <div className="detail-item">
+                  <label>Requirement Amount:</label>
+                  <span>{customer.requirementAmount ? `₹${customer.requirementAmount.toLocaleString()}` : "N/A"}</span>
+                </div>
+                <div className="detail-item">
+                  <label>Sanctioned Amount:</label>
+                  <span>{customer.sanctionedAmount ? `₹${customer.sanctionedAmount.toLocaleString()}` : "N/A"}</span>
+                </div>
+                <div className="detail-item"><label>Bank:</label><span>{customer.bankName || "N/A"}</span></div>
+                <div className="detail-item"><label>Branch:</label><span>{customer.branch || "N/A"}</span></div>
+                <div className="detail-item">
+                  <label>Channel Partner:</label>
+                  <span>{customer.channelPartner?.name || customer.channelPartner || "N/A"}</span>
+                </div>
+                <div className="detail-item"><label>Permanent Address:</label><span>{customer.permanentAddress || "N/A"}</span></div>
+                <div className="detail-item"><label>Current Address:</label><span>{customer.currentAddress || "N/A"}</span></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right-side Details */}
         <div className="profile-details">
-          <div className="detail-card">
-            <h4>Channel Partner</h4>
-            <p>
-              {customer.channelPartner?.name ||
-                customer.channelPartner ||
-                "N/A"}
-            </p>
-          </div>
-          <div className="detail-card">
-            <h4>Bank</h4>
-            <p>{customer.bankName || "N/A"}</p>
-          </div>
+          {/* Status card */}
           <div className="detail-card">
             <h4>Status</h4>
             <p className={isCustomerClosed ? "status-close" : "status-open"}>
@@ -186,150 +194,41 @@ export default function ViewCustomer() {
             </p>
           </div>
 
-          {/* Disbursement Amount Card */}
+          {/* 💰 Disbursed Amount (read-only, show Date • Amount • Notes) */}
           <div className="detail-card disbursement-card">
-            <div className="disbursement-header">
-              <div>
-                <h4>Disbursed Amount</h4>
-                <span className="status-indicator">
-                  Status: {customer.status || "open"}{" "}
-                  {isCustomerClosed ? "🔒" : "🔓"}
-                </span>
-              </div>
-              <button
-                className={`icon-btn small ${
-                  isCustomerClosed ? "disabled" : ""
-                }`}
-                onClick={() =>
-                  !isCustomerClosed && setShowDisbursementForm(!showDisbursementForm)
-                }
-                title={
-                  isCustomerClosed
-                    ? "Cannot add disbursement to closed customer"
-                    : "Add Disbursement"
-                }
-                disabled={isCustomerClosed}
-              >
-                <FiPlus size={16} />
-              </button>
-            </div>
-            <p className="disbursement-amount">
-              ₹{totalDisbursed.toLocaleString()}
-            </p>
-
-            {/* Disbursement Form */}
-            {showDisbursementForm && !isCustomerClosed && (
-              <div className="disbursement-form">
-                <form onSubmit={addDisbursement}>
-                  <div className="form-group">
-                    <input
-                      type="number"
-                      name="amount"
-                      value={newDisbursement.amount}
-                      onChange={handleDisbursementChange}
-                      className="input"
-                      placeholder="Amount"
-                      required
-                      min="1"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <input
-                      type="date"
-                      name="date"
-                      value={newDisbursement.date}
-                      onChange={handleDisbursementChange}
-                      className="input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      name="notes"
-                      value={newDisbursement.notes}
-                      onChange={handleDisbursementChange}
-                      className="input"
-                      placeholder="Notes (optional)"
-                    />
-                  </div>
-                  <div className="form-actions">
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      onClick={() => setShowDisbursementForm(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn success">
-                      Add Disbursement
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Disbursements List */}
-            {disbursements.length > 0 && (
+            <h4>Disbursed Amount</h4>
+            {sortedDisbursements.length > 0 && (
               <div className="disbursements-list">
-                <h5>Recent Disbursements:</h5>
-                {disbursements.slice(0, 3).map((disbursement) => (
-                  <div key={disbursement._id} className="disbursement-item">
+                {sortedDisbursements.map((d) => (
+                  <div key={d._id} className="disbursement-item">
                     <span className="disbursement-date">
-                      {new Date(disbursement.date).toLocaleDateString()}
+                      {new Date(d.date).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </span>
-                    <span className="disbursement-amount-item">
-                      ₹{disbursement.amount.toLocaleString()}
-                    </span>
-                    <button
-                      className={`icon-btn small danger ${
-                        isCustomerClosed ? "disabled" : ""
-                      }`}
-                      onClick={() =>
-                        !isCustomerClosed &&
-                        deleteDisbursement(disbursement._id)
-                      }
-                      title={
-                        isCustomerClosed
-                          ? "Cannot delete disbursement from closed customer"
-                          : "Delete disbursement"
-                      }
-                      disabled={isCustomerClosed}
-                    >
-                      <FiTrash2 size={12} />
-                    </button>
+                    <span className="disbursement-amount-item">₹{d.amount.toLocaleString()}</span>
+                    <span className="disbursement-notes">{d.notes || "-"}</span>
                   </div>
                 ))}
-                {disbursements.length > 3 && (
-                  <button
-                    className="view-all-btn"
-                    onClick={() => navigate(`/customers/${id}/edit`)}
-                  >
-                    View all {disbursements.length} disbursements
-                  </button>
-                )}
-              </div>
-            )}
-
-            {disbursements.length === 0 && !showDisbursementForm && (
-              <div className="no-disbursements">
-                <p>No disbursements recorded yet.</p>
-                {/* 🔴 Removed "Add First Disbursement" button here */}
               </div>
             )}
           </div>
 
-          <div className="detail-card">
-            <h4>Permanent Address</h4>
-            <p>{customer.permanentAddress || "N/A"}</p>
-          </div>
-          <div className="detail-card">
-            <h4>Current Address</h4>
-            <p>{customer.currentAddress || "N/A"}</p>
-          </div>
-          <div className="detail-card">
-            <h4>Notes</h4>
-            <p>{customer.notes || "No notes available"}</p>
+          {/* Customer Notes (editable with autosave) */}
+          <div className="detail-card editable-notes">
+            <div className="notes-header">
+              <h4>Notes</h4>
+              {saveStatus === "saving" && <span className="note-status saving">Saving...</span>}
+              {saveStatus === "saved" && <span className="note-status saved">Saved ✅</span>}
+              {saveStatus === "error" && <span className="note-status error">Error ❌</span>}
+            </div>
+            <textarea
+              value={noteText}
+              onChange={handleNoteChange}
+              placeholder="Write your notes here..."
+            />
           </div>
         </div>
       </div>

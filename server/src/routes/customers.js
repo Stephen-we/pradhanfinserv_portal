@@ -1,3 +1,4 @@
+// server/src/routes/customer.js
 import express from "express";
 import Customer from "../models/Customer.js";
 import { auth } from "../middleware/auth.js";
@@ -64,30 +65,7 @@ router.post("/", auth, allowRoles(["admin", "superadmin"]), async (req, res, nex
 });
 
 /* ================================
-   ✅ UPLOAD KYC
-================================ */
-router.post("/:id/kyc/upload", auth, upload.single("file"), async (req, res, next) => {
-  try {
-    const item = await Customer.findById(req.params.id);
-    if (!item) return res.status(404).json({ message: "Customer not found" });
-
-    if (!item.kyc) item.kyc = { files: [] };
-    item.kyc.files.push({
-      label: req.body.label || "KYC",
-      path: `/uploads/${req.file.filename}`,
-      originalName: req.file.originalname,
-    });
-
-    await item.save();
-    res.json({ ok: true, file: item.kyc.files[item.kyc.files.length - 1] });
-  } catch (e) {
-    next(e);
-  }
-});
-
-/* ================================
    ✅ UPDATE Customer
-   🔹 Allow both admin + superadmin
 ================================ */
 router.put("/:id", auth, allowRoles(["admin", "superadmin"]), async (req, res, next) => {
   try {
@@ -135,6 +113,82 @@ router.delete("/:id/photo", auth, async (req, res, next) => {
     if (!customer) return res.status(404).json({ message: "Customer not found" });
 
     customer.photo = null;
+    await customer.save();
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/* ================================
+   ✅ KYC File Upload
+================================ */
+router.post("/:id/kyc/upload", auth, upload.single("file"), async (req, res, next) => {
+  try {
+    const item = await Customer.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: "Customer not found" });
+
+    if (!item.kyc) item.kyc = { files: [] };
+    item.kyc.files.push({
+      label: req.body.label || "KYC",
+      path: `/uploads/${req.file.filename}`,
+      originalName: req.file.originalname,
+    });
+
+    await item.save();
+    res.json({ ok: true, file: item.kyc.files[item.kyc.files.length - 1] });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/* ================================
+   💰 DISBURSEMENT ROUTES
+================================ */
+
+// ➕ Add Disbursement
+router.post("/:id/disbursements", auth, async (req, res, next) => {
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    const disb = {
+      amount: req.body.amount,
+      date: req.body.date || new Date(),
+      notes: req.body.notes || "",
+    };
+
+    customer.disbursements.push(disb);
+    await customer.save();
+
+    res.status(201).json(disb);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 📋 List Disbursements
+router.get("/:id/disbursements", auth, async (req, res, next) => {
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    res.json(customer.disbursements || []);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ❌ Delete Disbursement
+router.delete("/:id/disbursements/:disbId", auth, async (req, res, next) => {
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    customer.disbursements = customer.disbursements.filter(
+      (d) => d._id.toString() !== req.params.disbId
+    );
+
     await customer.save();
     res.json({ ok: true });
   } catch (e) {

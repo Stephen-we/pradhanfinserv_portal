@@ -1,6 +1,7 @@
 // server/src/models/Customer.js
 import mongoose from "mongoose";
 
+// 🧾 File SubSchema
 const FileSchema = new mongoose.Schema(
   {
     label: String,
@@ -11,25 +12,33 @@ const FileSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// 💰 Disbursement SubSchema
+const DisbursementSchema = new mongoose.Schema({
+  amount: { type: Number, required: true },
+  date: { type: Date, default: Date.now },
+  notes: { type: String, default: "" },
+});
+
+// 👤 Customer Schema
 const CustomerSchema = new mongoose.Schema(
   {
     // IDs
-    customerId: { type: String, unique: true, required: true }, // <- required + unique
+    customerId: { type: String, unique: true, required: true },
 
     // Basics
     name: { type: String, required: true },
     dob: Date,
     mobile: String,
     email: String,
-    photo: String, 
+    photo: String,
 
-    // UI-facing simple fields (kept simple to match your current Customers page)
-    channelPartner: String,           // <- simple string so table shows it directly
-    bankName: String,                 // <- matches your table accessor
+    // UI-facing simple fields
+    channelPartner: String,
+    bankName: String,
     branch: String,
 
     // Status (Open/Close)
-    status: { type: String, enum: ["open", "close"], default: "open" }, // <- default Open
+    status: { type: String, enum: ["open", "close"], default: "open" },
 
     // KYC
     kyc: {
@@ -38,19 +47,19 @@ const CustomerSchema = new mongoose.Schema(
       files: [FileSchema],
     },
 
-    // Education (existing)
+    // Education
     education: {
       highestQualification: String,
       qualifyingYear: Number,
     },
 
-    // Family (existing)
+    // Family
     family: {
       maritalStatus: String,
       dependents: Number,
     },
 
-    // Address (existing)
+    // Address
     address: {
       permanent: {
         line1: String,
@@ -72,8 +81,11 @@ const CustomerSchema = new mongoose.Schema(
       },
     },
 
-    // Notes (existing)
-    logNotes: String,
+    // 💰 Disbursement details
+    disbursements: [DisbursementSchema],
+
+    // 📝 Notes
+    notes: { type: String, default: "" },
   },
   { timestamps: true }
 );
