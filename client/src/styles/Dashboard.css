@@ -106,3 +106,77 @@
   font-weight: 600;
   color: #0f172a;
 }
+
+.progress-wrapper { padding: 8px 2px; }
+.progress-top, .progress-foot { display:flex; justify-content:space-between; font-size:14px; }
+.progress-bar { height:12px; background:#eee; border-radius:6px; overflow:hidden; margin:8px 0; }
+.progress-fill { height:100%; background:#10b981; }
+.cards-grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:16px; }
+.two-col { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
+.mini-list { list-style:none; padding:0; margin:0; display:grid; gap:6px; font-size:14px; }
+
+/* --- SLICER PANEL --- */
+.slicer-btn {
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.slicer-btn:hover { background: #2563eb; }
+
+.slicer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 1000;
+}
+.slicer-panel {
+  background: #fff;
+  width: 320px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-shadow: -3px 0 10px rgba(0,0,0,0.3);
+  animation: slideIn 0.3s ease;
+}
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.slicer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.slicer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.slicer-body input {
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+.slicer-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+.close-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 20px;
+}

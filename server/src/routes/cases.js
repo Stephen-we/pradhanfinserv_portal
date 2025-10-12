@@ -10,6 +10,7 @@ import CaseAudit from "../models/CaseAudit.js";
 import { auth } from "../middleware/auth.js";
 import { upload } from "../middleware/uploads.js";
 import { listWithPagination } from "../utils/paginate.js";
+import { logAction } from "../middleware/audit.js";
 
 const router = express.Router();
 
@@ -100,14 +101,22 @@ router.get("/:id", auth, async (req, res, next) => {
       .populate("channelPartner", "name contact email")
       .populate("leadId", "leadType");
     if (!item) return res.status(404).json({ message: "Case not found" });
-
+      
+    // ✅ Log the update
+     await logAction({
+      req,
+      action: "update_case",
+      entityType: "Case",
+      entityId: req.params.id,
+      meta: { fields: Object.keys(req.body || {}) },
+    });
+    
     res.json(item);
   } catch (e) {
     next(e);
   }
 });
 
-//
 // 🔓 Public GET
 //
 router.get("/:id/public", async (req, res, next) => {

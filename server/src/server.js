@@ -7,6 +7,8 @@ import morgan from "morgan";
 import mongoose from "mongoose";
 import path from "path";
 import { fileURLToPath } from "url";
+import metricsRoutes from "./routes/metrics.js";
+
 
 // ---- Routes ----
 import authRoutes from "./routes/auth.js";
@@ -19,6 +21,8 @@ import branchRoutes from "./routes/branches.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import customerDocs from "./routes/customerDocs.js";
 import taskRoutes from "./routes/tasks.js";
+import auditRoutes from "./routes/audit.js";
+
 
 dotenv.config();
 const app = express();
@@ -83,6 +87,10 @@ app.use("/api/branches", branchRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/customer-docs", customerDocs);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/metrics", metricsRoutes);
+app.use("/api/audit", auditRoutes);
+
+
 
 // ---- Static Uploads ----
 // ✅ Serve files from server/uploads

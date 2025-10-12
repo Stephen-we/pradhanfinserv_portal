@@ -5,6 +5,8 @@ import Customer from "../models/Customer.js";
 import { auth } from "../middleware/auth.js";
 import { allowRoles } from "../middleware/roles.js";
 import { listWithPagination } from "../utils/paginate.js";
+import { logAction } from "../middleware/audit.js";
+
 
 const router = express.Router();
 
@@ -37,6 +39,15 @@ router.get("/", auth, async (req, res, next) => {
       { page, limit },
       { path: "assignedTo", select: "name role" }
     );
+
+     // ✅ Log the update
+    await logAction({
+      req,
+      action: "update_case",
+      entityType: "Case",
+      entityId: req.params.id,
+      meta: { fields: Object.keys(req.body || {}) },
+    });
 
     res.json(data);
   } catch (e) {

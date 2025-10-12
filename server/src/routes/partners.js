@@ -4,6 +4,8 @@ import Partner from "../models/ChannelPartner.js";
 import { auth } from "../middleware/auth.js";
 import { listWithPagination } from "../utils/paginate.js";
 const router = express.Router();
+import { logAction } from "../middleware/audit.js";
+
 
 // GET /channel-partners - Get all channel partners with search and pagination
 router.get("/", auth, async (req, res, next) => {
@@ -27,6 +29,14 @@ router.get("/", auth, async (req, res, next) => {
       page: pageNum,
       limit: limitNum,
       sort: { name: 1 } // ✅ Consistent sorting
+    });
+   
+    await logAction({
+      req,
+      action: "update_case",
+      entityType: "Case",
+      entityId: req.params.id,
+      meta: { fields: Object.keys(req.body || {}) },
     });
 
     res.json(data);

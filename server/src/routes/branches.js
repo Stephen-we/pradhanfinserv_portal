@@ -3,6 +3,8 @@ import express from "express";
 import Branch from "../models/BankBranch.js";
 import { auth } from "../middleware/auth.js";
 import { listWithPagination } from "../utils/paginate.js";
+import { logAction } from "../middleware/audit.js";
+
 
 const router = express.Router();
 
@@ -20,6 +22,16 @@ router.get("/", auth, async (req, res, next) => {
         }
       : {};
     const data = await listWithPagination(Branch, cond, { page, limit });
+   
+     // ✅ Log the update
+    await logAction({
+      req,
+      action: "update_case",
+      entityType: "Case",
+      entityId: req.params.id,
+      meta: { fields: Object.keys(req.body || {}) },
+    });
+    
     res.json(data);
   } catch (e) {
     next(e);

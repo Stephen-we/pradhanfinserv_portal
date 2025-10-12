@@ -2,6 +2,8 @@ import express from "express";
 import User from "../models/User.js";
 import { auth } from "../middleware/auth.js";
 import { allowRoles } from "../middleware/roles.js"; // ✅ FIXED
+import { logAction } from "../middleware/audit.js";
+
 
 const router = express.Router();
 
@@ -19,6 +21,15 @@ router.post("/", auth, allowRoles(["admin", "superadmin"]), async (req, res, nex
 
     const user = new User({ name, email, password, role });
     await user.save();
+    
+    await logAction({
+      req,
+      action: "update_case",
+      entityType: "Case",
+      entityId: req.params.id,
+      meta: { fields: Object.keys(req.body || {}) },
+    });
+
     res.status(201).json({ ok: true, id: user._id });
   } catch (e) {
     next(e);

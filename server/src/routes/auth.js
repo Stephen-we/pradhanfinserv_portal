@@ -3,6 +3,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { auth } from "../middleware/auth.js"; // ✅ import middleware
+import { logAction } from "../middleware/audit.js";
 
 const router = express.Router();
 
@@ -55,6 +56,16 @@ router.post("/login", async (req, res, next) => {
     }
 
     const token = sign(user);
+    
+    // ✅ Log the update
+    await logAction({
+      req,
+      action: "update_case",
+      entityType: "Case",
+      entityId: req.params.id,
+      meta: { fields: Object.keys(req.body || {}) },
+    });
+
     res.json({
       token,
       user: { id: user._id, name: user.name, email: user.email, role: user.role },

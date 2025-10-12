@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import Counter from "./Counter.js"; // ✅ reuse the same counter model you used for Leads
 
+
 const BankBranchSchema = new mongoose.Schema(
   {
     branchId: { type: String, unique: true }, // auto generated

@@ -1,6 +1,7 @@
 import express from "express";
 import Task from "../models/Task.js";
 import { auth } from "../middleware/auth.js";
+import { logAction } from "../middleware/audit.js";
 
 const router = express.Router();
 
@@ -18,6 +19,14 @@ router.get("/case/:caseId", auth, async (req, res, next) => {
 router.post("/", auth, async (req, res, next) => {
   try {
     const task = await Task.create(req.body);
+    await logAction({
+      req,
+      action: "update_case",
+      entityType: "Case",
+      entityId: req.params.id,
+      meta: { fields: Object.keys(req.body || {}) },
+    });
+
     res.status(201).json(task);
   } catch (err) {
     next(err);
