@@ -7,6 +7,8 @@ import ArchivedLeads from "./pages/leads/ArchivedLeads";
 import DeletedLeads from "./pages/leads/DeletedLeads";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import CreateAdmin from "./pages/CreateAdmin";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
 import Customers from "./pages/Customers";
@@ -25,6 +27,9 @@ import LeadFormCase from "./pages/cases/LeadFormCase";
 import CaseTasks from "./pages/cases/CaseTasks";
 import PartnerView from "./pages/PartnerView"; // ✅ ADD THIS IMPORT
 import EditPartner from "./pages/EditPartner"; // ✅ ADD THIS FOR EDIT FUNCTIONALITY
+
+
+
 
 
 // Layouts
@@ -68,6 +73,11 @@ export default function App() {
           </Protected>
         }
       />
+
+      <Route path="/create-admin" element={<CreateAdmin />} />
+
+
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* Leads Routes */}
       <Route

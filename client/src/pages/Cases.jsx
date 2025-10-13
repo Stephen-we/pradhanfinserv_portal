@@ -1,4 +1,3 @@
-// client/src/pages/Cases.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import API from "../services/api";
@@ -19,16 +18,19 @@ export default function Cases() {
   const [localAssignments, setLocalAssignments] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // 🔹 Load cases with filters (useCallback to prevent unnecessary recreations)
+  // ✅ Current user
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isAdmin = ["admin", "superadmin"].includes(user.role);
+
+  // ✅ Load Cases
   const load = useCallback(async () => {
-    if (isLoading) return; // Prevent concurrent calls
-    
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const { data } = await API.get("/cases", {
         params: {
           page: state.page,
-          q: state.q,
+          q: state.q.trim() || undefined,
           assignedTo: state.filterAssigned || undefined,
           task: state.filterTask || undefined,
         },
@@ -36,104 +38,53 @@ export default function Cases() {
 
       const items = Array.isArray(data) ? data : data.items || [];
       const pages = Array.isArray(data) ? 1 : data.pages || 1;
-      
-      // ✅ Preserve local assignments during reload
       setState((s) => ({ ...s, items, pages }));
     } catch (err) {
       console.error("Failed to load cases:", err);
-      alert("❌ Could not load cases. Check console.");
     } finally {
       setIsLoading(false);
     }
-  }, [state.page, state.q, state.filterAssigned, state.filterTask, isLoading]);
+  }, [state.page, state.q, state.filterAssigned, state.filterTask]);
 
-  // 🔹 Load users for assignment + filter
-    const loadUsers = async () => {
-      try {
-        const res = await API.get("/users");
-        const data = res.data;
-        const users = Array.isArray(data) ? data : data.items || [];
-        setState((s) => ({ ...s, users }));
-      } catch (err) {
-        console.error("User load failed:", err);
-        alert("Failed to load users");
-      }
-    };
-
-
-  // ✅ Optimized useEffect with proper dependencies
   useEffect(() => {
     load();
-  }, [load]); // Now only re-runs when load function changes
+  }, [load]);
 
+  // ✅ Load Users
+  const loadUsers = async () => {
+    try {
+      const { data } = await API.get("/users");
+      setState((s) => ({ ...s, users: data }));
+    } catch (err) {
+      if (err.response?.status === 403) {
+        const { data } = await API.get("/users/public");
+        setState((s) => ({ ...s, users: data }));
+      } else console.error("User load failed:", err);
+    }
+  };
   useEffect(() => {
     loadUsers();
   }, []);
 
-  // 🔹 Change case status
-  const changeStatus = async (row) => {
-    const status = prompt(
-      "New status (in-progress, pending-documents, approved, rejected, disbursed)",
-      row.status
-    );
-    if (status) {
-      await API.put(`/cases/${row._id}`, { ...row, status });
-      load();
-    }
-  };
-
-  // 🔹 Add comment
-  const comment = async (row) => {
-    const c = prompt("Comment");
-    if (c) {
-      await API.post(`/cases/${row._id}/comment`, { comment: c });
-      alert("Comment added");
-    }
-  };
-
-  // 🔹 View audit trail
-  const viewAudit = async (row) => {
-    const { data } = await API.get(`/cases/${row._id}/audit`);
-    alert(
-      data
-        .map(
-          (a) =>
-            `${new Date(a.createdAt).toLocaleString()} - ${a.action}${
-              a.fromStatus ? ` ${a.fromStatus}→${a.toStatus}` : ""
-            } ${a.comment ? `- ${a.comment}` : ""} by ${a.actor?.name || ""}`
-        )
-        .join("\n") || "No logs"
-    );
-  };
-
-  // 🔹 Assign user (Optimistic Update)
+  // ✅ Assign handler (admin only)
   const handleAssignChange = async (row, userId) => {
+    if (!isAdmin) {
+      alert("You don’t have permission to assign cases.");
+      return;
+    }
     try {
       setAssigningId(row._id);
-
-      // ✅ Update instantly on UI
       setLocalAssignments((prev) => ({ ...prev, [row._id]: userId || null }));
-      setState((s) => ({
-        ...s,
-        items: s.items.map((item) =>
-          item._id === row._id ? { ...item, assignedTo: userId || null } : item
-        ),
-      }));
-
       await API.put(`/cases/${row._id}`, { assignedTo: userId || null });
+      load();
     } catch (error) {
       console.error("Assignment failed:", error);
       alert(`Assignment failed: ${error.response?.data?.message || error.message}`);
-      
-      // ✅ Revert on error
-      setLocalAssignments((prev) => ({ ...prev, [row._id]: undefined }));
-      load(); // Reload to get correct state
     } finally {
       setAssigningId(null);
     }
   };
 
-  // ✅ Helper to extract Assigned ID
   const getAssignedId = (row) => {
     if (localAssignments[row._id] !== undefined)
       return localAssignments[row._id] || "";
@@ -143,239 +94,136 @@ export default function Cases() {
     return "";
   };
 
-  // ✅ Debounced amount update to prevent race conditions
-  const [amountTimeouts, setAmountTimeouts] = useState({});
+  // ✅ OTP Protected Export
+  const handleExport = async () => {
+    try {
+      const { data } = await API.post("/cases/export/request-otp");
+      alert("OTP sent to owner’s email. Please enter it to confirm export.");
+      const otp = prompt("Enter OTP received by owner:");
+      if (!otp) return alert("Export cancelled.");
 
-  const handleAmountChange = async (row, value) => {
-    const caseId = row._id;
-    
-    // Clear existing timeout for this case
-    if (amountTimeouts[caseId]) {
-      clearTimeout(amountTimeouts[caseId]);
-    }
+      const res = await API.post("/cases/export/verify", { otp });
+      if (res.data.ok) {
+        const csv = [
+          ["Case ID", "Customer", "Lead Type", "Assigned To", "Bank", "Branch", "Created At"],
+          ...res.data.items.map((c) => [
+            c.caseId,
+            c.customerName,
+            c.leadType,
+            c.assignedTo?.name || "",
+            c.bank,
+            c.branch,
+            new Date(c.createdAt).toLocaleString(),
+          ]),
+        ]
+          .map((r) => r.join(","))
+          .join("\n");
 
-    // ✅ Optimistic UI update immediately
-    setState((s) => ({
-      ...s,
-      items: s.items.map((item) =>
-        item._id === caseId ? { ...item, amount: value === "" ? null : Number(value) } : item
-      ),
-    }));
-
-    // Set new timeout for API call
-    const timeoutId = setTimeout(async () => {
-      try {
-        const payload = {
-          amount: value === "" ? null : Number(value),
-        };
-        
-        await API.put(`/cases/${caseId}`, payload);
-        console.log("✅ Amount updated successfully");
-      } catch (error) {
-        console.error("Amount update failed:", error);
-        // Revert on error
-        setState((s) => ({
-          ...s,
-          items: s.items.map((item) =>
-            item._id === caseId ? { ...item, amount: row.amount } : item
-          ),
-        }));
-        alert("Amount update failed!");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "cases_export.csv";
+        a.click();
+        URL.revokeObjectURL(url);
       }
-    }, 1000); // 1 second delay
-
-    setAmountTimeouts((prev) => ({
-      ...prev,
-      [caseId]: timeoutId
-    }));
+    } catch (err) {
+      console.error("Export error:", err);
+      alert(err.response?.data?.message || "Export failed");
+    }
   };
 
   return (
     <div>
-      <header>
-        <h1>Loan Cases</h1>
-      </header>
+      <h1>Loan Cases</h1>
 
-      {/* ✅ Filter section */}
-      <div
+      {/* ✅ Export Button */}
+      <button
+        onClick={handleExport}
         style={{
-          display: "flex",
-          gap: 10,
           marginBottom: 10,
-          flexWrap: "wrap",
-          alignItems: "center",
+          padding: "6px 14px",
+          background: "steelblue",
+          color: "white",
+          borderRadius: 6,
+          border: "none",
+          cursor: "pointer",
         }}
       >
-        {/* Assigned Filter */}
-        <select
-          value={state.filterAssigned}
-          onChange={(e) =>
-            setState((s) => ({ ...s, filterAssigned: e.target.value, page: 1 }))
-          }
-          style={{
-            padding: 6,
-            minWidth: 180,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        >
-          <option value="">All Assigned</option>
-          {state.users.map((u) => (
-            <option key={u._id} value={u._id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Task Filter */}
-        <select
-          value={state.filterTask}
-          onChange={(e) =>
-            setState((s) => ({ ...s, filterTask: e.target.value, page: 1 }))
-          }
-          style={{
-            padding: 6,
-            minWidth: 180,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        >
-          <option value="">All Tasks</option>
-          <option value="Follow-up with customer">Follow-up with customer</option>
-          <option value="Pending">Pending</option>
-          <option value="In-progress">In-progress</option>
-          <option value="Complete">Complete</option>
-        </select>
-
-        {/* ✅ Reset Button */}
-        <button
-          onClick={() =>
-            setState((s) => ({
-              ...s,
-              filterAssigned: "",
-              filterTask: "",
-              page: 1,
-            }))
-          }
-          style={{
-            padding: "6px 12px",
-            backgroundColor: "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: 500,
-          }}
-        >
-          Reset Filters
-        </button>
-      </div>
+        Export Cases (OTP Protected)
+      </button>
 
       {/* ✅ Data Table */}
       <DataTable
         columns={[
-          {
-            header: "Sr. No",
-            accessor: (row, index, exportMode) =>
-              exportMode ? index + 1 : index + 1,
-          },
+          { header: "Sr. No", accessor: (r, i) => i + 1 },
           {
             header: "Case ID",
-            accessor: (row, index, exportMode) =>
-              exportMode ? row.caseId || "-" : (
-                <Link to={`/cases/${row._id}/view`} style={{ color: "blue" }}>
-                  {row.caseId || "-"}
-                </Link>
-              ),
+            accessor: (row) => (
+              <Link to={`/cases/${row._id}/view`} style={{ color: "blue" }}>
+                {row.caseId || "-"}
+              </Link>
+            ),
           },
           { header: "Customer Name", accessor: "customerName" },
-          { header: "Mobile", accessor: "mobile" },
-
-          // ✅ Lead Type column
           { header: "Lead Type", accessor: "leadType" },
-
-          // Assigned column
           {
             header: "Assigned",
             accessor: (row) => {
               const current = getAssignedId(row);
+              let assignedName = "Unassigned";
+
+              if (typeof row.assignedTo === "object" && row.assignedTo?.name) {
+                assignedName = row.assignedTo.name;
+              } else if (typeof row.assignedTo === "string" && state.users.length > 0) {
+                const match = state.users.find((u) => u._id === row.assignedTo);
+                assignedName = match ? match.name : "Unassigned";
+              }
+
+              if (isAdmin) {
+                return (
+                  <select
+                    value={current}
+                    disabled={assigningId === row._id}
+                    onChange={(e) => handleAssignChange(row, e.target.value)}
+                    style={{ padding: 4, minWidth: 140 }}
+                  >
+                    <option value="">Unassigned</option>
+                    {state.users.map((u) => (
+                      <option key={u._id} value={u._id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                );
+              }
+
               return (
-                <select
-                  value={current}
-                  disabled={assigningId === row._id}
-                  onChange={(e) => handleAssignChange(row, e.target.value)}
+                <span
                   style={{
-                    padding: 4,
-                    minWidth: 140,
-                    opacity: assigningId === row._id ? 0.7 : 1,
+                    fontWeight: 500,
+                    color: assignedName === "Unassigned" ? "gray" : "black",
                   }}
                 >
-                  <option value="">Unassigned</option>
-                  {state.users.map((u) => (
-                    <option key={u._id} value={u._id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                  {assignedName}
+                </span>
               );
             },
           },
-
-          // Task column
           {
             header: "Task",
-            accessor: (row) => {
-              const handleTaskChange = async (value) => {
-                try {
-                  // ✅ Optimistic UI update
-                  setState((s) => ({
-                    ...s,
-                    items: s.items.map((item) =>
-                      item._id === row._id ? { ...item, task: value } : item
-                    ),
-                  }));
-
-                  await API.put(`/cases/${row._id}`, { task: value });
-                } catch (err) {
-                  console.error("Task update failed:", err);
-                  alert("Task update failed!");
-                }
-              };
-              return (
-                <select
-                  value={row.task || ""}
-                  onChange={(e) => handleTaskChange(e.target.value)}
-                  style={{ padding: 4, minWidth: 160 }}
-                >
-                  <option value="">Select Task</option>
-                  <option value="Follow-up with customer">
-                    Follow-up with customer
-                  </option>
-                  <option value="Pending">Pending</option>
-                  <option value="In-progress">In-progress</option>
-                  <option value="Complete">Complete</option>
-                </select>
-              );
-            },
-          },
-
-          // ✅ Sanctioned Amount (manual, supports blank, debounced save)
-          {
-            header: "Sanctioned Amount",
             accessor: (row) => (
-              <input
-                type="number"
-                inputMode="decimal"
-                value={row.amount ?? ""} // stays blank if null/undefined
-                onChange={(e) => handleAmountChange(row, e.target.value)}
-                placeholder="Enter amount"
-                style={{
-                  padding: 4,
-                  minWidth: 120,
-                  borderRadius: 4,
-                  border: "1px solid #ccc",
-                }}
-              />
+              <select
+                value={row.task || ""}
+                onChange={(e) => API.put(`/cases/${row._id}`, { task: e.target.value })}
+                style={{ padding: 4, minWidth: 160 }}
+              >
+                <option value="">Select Task</option>
+                <option value="Follow-up with customer">Follow-up with customer</option>
+                <option value="Pending">Pending</option>
+                <option value="In-progress">In-progress</option>
+                <option value="Complete">Complete</option>
+              </select>
             ),
           },
         ]}
@@ -383,20 +231,7 @@ export default function Cases() {
         page={state.page}
         pages={state.pages}
         onPage={(p) => setState((s) => ({ ...s, page: p }))}
-        onSearch={(q) => setState((s) => ({ ...s, q, page: 1 }))}
-        renderActions={(row) => (
-          <div style={{ display: "flex", gap: 6 }}>
-            <button className="btn" onClick={() => changeStatus(row)}>
-              Change Status
-            </button>
-            <button className="btn secondary" onClick={() => comment(row)}>
-              Comment
-            </button>
-            <button className="btn" onClick={() => viewAudit(row)}>
-              View Audit
-            </button>
-          </div>
-        )}
+        onSearch={(q) => setState((s) => ({ ...s, q, page: 1 }))} // ✅ search now linked
       />
     </div>
   );

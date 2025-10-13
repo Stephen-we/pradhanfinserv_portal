@@ -1,6 +1,5 @@
 // client/src/components/DataTable.jsx
 import React from "react";
-import * as XLSX from "xlsx";
 
 export default function DataTable({
   columns = [],
@@ -11,24 +10,6 @@ export default function DataTable({
   onSearch,
   extraToolbar,
 }) {
-  const exportExcel = () => {
-    const data = rows.map((r, i) => {
-      const obj = {};
-      columns.forEach((c) => {
-        if (typeof c.accessor === "function") {
-          obj[c.header] = c.accessor(r, i, true); // ✅ pass exportMode = true
-        } else {
-          obj[c.header] = r[c.accessor];
-        }
-      });
-      return obj;
-    });
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    XLSX.writeFile(wb, "export.xlsx");
-  };
-
   return (
     <div className="card">
       {/* Toolbar */}
@@ -38,9 +19,7 @@ export default function DataTable({
           placeholder="Search..."
           onChange={(e) => onSearch?.(e.target.value)}
         />
-        <button className="btn secondary" onClick={exportExcel}>
-          Export Excel
-        </button>
+        {/* 🧹 Removed old unprotected Export button */}
         {extraToolbar}
       </div>
 
@@ -54,20 +33,27 @@ export default function DataTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={r._id || i}>
-              {columns.map((col) => (
-                <td key={col.header}>
-              {col.cell
-                ? col.cell(r[col.accessor], r, i) // ✅ custom JSX cell
-                : typeof col.accessor === "function"
-                ? col.accessor(r, i, false)
-                : r[col.accessor]}
-            </td>
-
-              ))}
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} style={{ textAlign: "center", padding: 20 }}>
+                No records found
+              </td>
             </tr>
-          ))}
+          ) : (
+            rows.map((r, i) => (
+              <tr key={r._id || i}>
+                {columns.map((col) => (
+                  <td key={col.header}>
+                    {col.cell
+                      ? col.cell(r[col.accessor], r, i)
+                      : typeof col.accessor === "function"
+                      ? col.accessor(r, i, false)
+                      : r[col.accessor]}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
 

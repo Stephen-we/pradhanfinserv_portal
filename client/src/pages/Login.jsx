@@ -1,22 +1,29 @@
 // client/src/pages/Login.jsx
-
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-
+import { useNavigate, Link } from "react-router-dom";
 import API from "../services/api";
 
-// ⬇️ Updated path to new logo
-import logo from "../assets/logo/logo.png";  // ✅ NEW PATH
+import logo from "../assets/logo/logo.png";
+import img1 from "../assets/1.png";
+import img2 from "../assets/2.png";
+import img3 from "../assets/3.png";
 
-import img1 from "../assets/1.png";     // ✅ CORRECT PATH
-import img2 from "../assets/2.png";     // ✅ CORRECT PATH
-import img3 from "../assets/3.png";     // ✅ CORRECT PATH
-
-// ✅ Slides with images + messages
 const slides = [
-  { img: img1, message: "Protect your family with the best insurance plans – safe, reliable, and affordable." },
-  { img: img2, message: "Your perfect home loan awaits – low EMI, high eligibility, and fast processing." },
-  { img: img3, message: "Business loans made simple – fuel your growth with trusted financial support." }
+  {
+    img: img1,
+    message:
+      "Protect your family with the best insurance plans – safe, reliable, and affordable.",
+  },
+  {
+    img: img2,
+    message:
+      "Your perfect home loan awaits – low EMI, high eligibility, and fast processing.",
+  },
+  {
+    img: img3,
+    message:
+      "Business loans made simple – fuel your growth with trusted financial support.",
+  },
 ];
 
 export default function Login() {
@@ -24,10 +31,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [current, setCurrent] = useState(0);
-
   const navigate = useNavigate();
 
-  // ✅ Auto rotation
+  // ✅ Auto-rotate carousel
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrent((c) => (c + 1) % slides.length);
@@ -35,7 +41,6 @@ export default function Login() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Manual navigation
   const goPrev = () => setCurrent((c) => (c - 1 + slides.length) % slides.length);
   const goNext = () => setCurrent((c) => (c + 1) % slides.length);
   const goTo = (idx) => setCurrent(idx);
@@ -55,12 +60,13 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      {/* Left side */}
+      {/* Left side - Login form */}
       <div className="login-left">
         <img src={logo} alt="logo" className="logo" />
         <h2>Login into your account</h2>
 
         <form onSubmit={submit}>
+          {/* Email input */}
           <div className="input-group">
             <span className="input-icon">👤</span>
             <input
@@ -73,6 +79,7 @@ export default function Login() {
             />
           </div>
 
+          {/* Password input */}
           <div className="input-group">
             <span className="input-icon">🔒</span>
             <input
@@ -85,23 +92,54 @@ export default function Login() {
             />
           </div>
 
-          {error && <div style={{ color: "red" }}>{error}</div>}
-          <button className="btn" type="submit">Sign In</button>
-        </form>
+          {/* Error message */}
+          {error && <div style={{ color: "red", marginBottom: 8 }}>{error}</div>}
 
-        <p className="forgot">
-          Forgot password? <a href="#">Reset</a>
-        </p>
+          {/* Login button */}
+          <button className="btn" type="submit">
+            Sign In
+          </button>
+
+          {/* Below form links */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 12,
+            }}
+          >
+            <Link
+              to="/create-admin"
+              className="link"
+              style={{ color: "steelblue", fontWeight: 500 }}
+            >
+              Create Admin
+            </Link>
+
+            <Link
+              to="/forgot-password"
+              className="link"
+              style={{ color: "steelblue", fontWeight: 500 }}
+            >
+              Forgot Password?
+            </Link>
+          </div>
+        </form>
       </div>
 
-      {/* Right side (Carousel) */}
+      {/* Right side - Carousel */}
       <div className="login-right">
         <div className="carousel">
-          <button className="arrow left" onClick={goPrev}>‹</button>
+          <button className="arrow left" onClick={goPrev}>
+            ‹
+          </button>
           <img src={slides[current].img} alt="slide" className="carousel-img" />
-          <button className="arrow right" onClick={goNext}>›</button>
+          <button className="arrow right" onClick={goNext}>
+            ›
+          </button>
         </div>
 
+        {/* Message below image */}
         <p className="login-message">{slides[current].message}</p>
 
         {/* Dots navigation */}
@@ -113,6 +151,24 @@ export default function Login() {
               onClick={() => goTo(i)}
             ></span>
           ))}
+        </div>
+
+        {/* ✅ Right-side quick links (optional redundant copy, safe to keep) */}
+        <div
+          style={{
+            marginTop: 15,
+            display: "flex",
+            flexDirection: "column",
+            gap: 5,
+            alignItems: "center",
+          }}
+        >
+          <Link to="/create-admin" className="link" style={{ color: "white" }}>
+            Create Admin Account
+          </Link>
+          <Link to="/forgot-password" className="link" style={{ color: "white" }}>
+            Forgot Password?
+          </Link>
         </div>
       </div>
     </div>
