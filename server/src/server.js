@@ -7,8 +7,6 @@ import morgan from "morgan";
 import mongoose from "mongoose";
 import path from "path";
 import { fileURLToPath } from "url";
-import metricsRoutes from "./routes/metrics.js";
-
 
 // ---- Routes ----
 import authRoutes from "./routes/auth.js";
@@ -22,7 +20,7 @@ import dashboardRoutes from "./routes/dashboard.js";
 import customerDocs from "./routes/customerDocs.js";
 import taskRoutes from "./routes/tasks.js";
 import auditRoutes from "./routes/audit.js";
-
+import metricsRoutes from "./routes/metrics.js";
 
 dotenv.config();
 const app = express();
@@ -31,28 +29,34 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ---- Middleware ----
+// ---- Allowed Origins (dynamic + static fallback) ----
 let allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
-if (allowedOrigins.length === 0) {
-  allowedOrigins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-  ];
+// ✅ Add Cloudflare + local domains if not already included
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
+  "https://stephenweb.xyz",
+  "https://api.stephenweb.xyz",
+];
+
+for (const origin of defaultOrigins) {
+  if (!allowedOrigins.includes(origin)) allowedOrigins.push(origin);
 }
 
-// ✅ CORS setup
+// ✅ CORS setup with logging for unauthorized domains
 app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin || allowedOrigins.includes(origin)) {
         cb(null, true);
       } else {
+        console.warn("❌ Blocked by CORS:", origin);
         cb(new Error(`Not allowed by CORS: ${origin}`));
       }
     },
@@ -60,6 +64,7 @@ app.use(
   })
 );
 
+// ---- Middleware ----
 app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
@@ -76,7 +81,7 @@ try {
 // ---- Root ----
 app.get("/", (req, res) => res.json({ ok: true, service: "DSA CRM API" }));
 
-// ---- API ----
+// ---- API Routes ----
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/leads", leadRoutes);
@@ -90,10 +95,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/metrics", metricsRoutes);
 app.use("/api/audit", auditRoutes);
 
-
-
 // ---- Static Uploads ----
-// ✅ Serve files from server/uploads
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // ---- Error Handler ----
@@ -102,6 +104,6 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || "Server error" });
 });
 
-// ---- Start ----
+// ---- Start Server ----
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));

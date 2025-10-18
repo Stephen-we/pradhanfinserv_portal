@@ -10,9 +10,7 @@ import {
   FiUsers,
   FiMapPin,
   FiPaperclip,
-  FiDownload,
   FiAlertCircle,
-  FiCheckCircle,
   FiTrendingUp,
 } from "react-icons/fi";
 import "../../styles/cases.css";
@@ -20,7 +18,7 @@ import "../../styles/cases.css";
 export default function ViewLeadCase() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [caseData, setCaseData] = useState(null);
+  const [caseData, setCaseData] = useState({ documentSections: [] }); // ✅ Safe init
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +45,7 @@ export default function ViewLeadCase() {
         setIsLoading(true);
         setError(null);
         const { data } = await API.get(`/cases/${id}`);
+        if (!Array.isArray(data.documentSections)) data.documentSections = []; // ✅ safety
         setCaseData(data);
         setNotes(data.notes || "");
       } catch (err) {
@@ -59,16 +58,16 @@ export default function ViewLeadCase() {
     loadCase();
   }, [id]);
 
-  // -------- Progress Calculation --------
-    const progress = useMemo(() => {
+  // -------- Progress Calculation (safe) --------
+  const progress = useMemo(() => {
     if (!caseData) return 0;
 
     const required = [
       "leadId",
-      "customerName", 
+      "customerName",
       "mobile",
       "email",
-      "leadType", // ✅ CHANGED: from loanType to leadType
+      "leadType",
       "amount",
       "permanentAddress",
     ];
@@ -77,30 +76,26 @@ export default function ViewLeadCase() {
       (f) => caseData[f] && caseData[f].toString().trim() !== ""
     );
 
-    const hasDocuments =
-      (caseData.documentSections &&
-        caseData.documentSections.some((section) =>
-          section.documents.some(
-            (doc) => doc.files && doc.files.length > 0
-          )
-        )) ||
-      (caseData.kycDocs &&
-        Object.values(caseData.kycDocs).some(
-          (files) => files && files.length > 0
-        ));
+    const hasDocuments = caseData?.documentSections?.some?.(
+      (section) =>
+        Array.isArray(section?.documents) &&
+        section.documents?.some?.(
+          (doc) =>
+            Array.isArray(doc?.files) &&
+            doc.files?.some?.(
+              (f) => !f?.isDeleted && f?.isActive !== false
+            )
+        )
+    );
 
     const baseProgress = Math.round((filled.length / required.length) * 70);
     const documentProgress = hasDocuments ? 30 : 0;
-
     return baseProgress + documentProgress;
   }, [caseData]);
 
-  // -------- Helper Functions --------
+  // -------- Helpers --------
   const show = (v) => (v && v !== "" ? v : "-");
-
-  const goEdit = () => {
-    if (caseData?._id) navigate(`/cases/${caseData._id}/edit`);
-  };
+  const goEdit = () => caseData?._id && navigate(`/cases/${caseData._id}/edit`);
 
   const saveNotes = async () => {
     try {
@@ -114,62 +109,48 @@ export default function ViewLeadCase() {
     }
   };
 
-  // -------- File URL Helper --------
+  // -------- File URL --------
   const getFileUrl = (file) => {
     if (!file) return null;
     if (typeof file === "string" && file.startsWith("http")) return file;
     const filename =
       file.filename || file.name || (typeof file === "string" ? file : null);
-    if (filename) {
-      return `${filesBase}/uploads/${filename}`;
-    }
-    return null;
+    return filename ? `${filesBase}/uploads/${filename}` : null;
   };
 
-  // -------- Document Stats --------
- // In ViewLeadCase.jsx, update the getDocumentStats function:
+  // -------- Document Stats (safe) --------
+  const getDocumentStats = () => {
+    if (!caseData) return { totalFiles: 0, totalSections: 0, fileDetails: [] };
 
-// In ViewLeadCase.jsx - Update getDocumentStats to filter deleted files
+    let totalFiles = 0;
+    let fileDetails = [];
 
-const getDocumentStats = () => {
-  if (!caseData) return { totalFiles: 0, totalSections: 0, fileDetails: [] };
-  
-  let totalFiles = 0;
-  let fileDetails = [];
-
-  // Count only active files from documentSections
-    if (caseData.documentSections && Array.isArray(caseData.documentSections)) {
-      caseData.documentSections.forEach((section) => {
-        if (section.documents && Array.isArray(section.documents)) {
-          section.documents.forEach((doc) => {
-            if (doc.files && Array.isArray(doc.files)) {
-              doc.files.forEach((file) => {
-                // ✅ Only count files that are not deleted
-                if (file && file.filename && !file.isDeleted && file.isActive !== false) {
-                  totalFiles++;
-                  fileDetails.push({
-                    section: section.name || "Documents",
-                    document: doc.name || "Files",
-                    file: file,
-                    url: getFileUrl(file),
-                  });
-                }
-              });
-            }
-          });
-        }
+    caseData?.documentSections?.forEach?.((section) => {
+      section?.documents?.forEach?.((doc) => {
+        doc?.files?.forEach?.((file) => {
+          if (file && file.filename && !file.isDeleted && file.isActive !== false) {
+            totalFiles++;
+            fileDetails.push({
+              section: section.name || "Documents",
+              document: doc.name || "Files",
+              file: file,
+              url: getFileUrl(file),
+            });
+          }
+        });
       });
-    }
+    });
 
     console.log(`📊 Found ${totalFiles} active files in case data`);
 
     return {
       totalFiles,
-      totalSections: caseData.documentSections?.length || 0,
+      totalSections: caseData?.documentSections?.length || 0,
       fileDetails,
     };
   };
 
+  // -------- Download --------
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
@@ -184,11 +165,9 @@ const getDocumentStats = () => {
 
       const res = await API.get(`/cases/${caseData._id}/download`, {
         responseType: "blob",
-        onDownloadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percent = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
+        onDownloadProgress: (e) => {
+          if (e.total) {
+            const percent = Math.round((e.loaded * 100) / e.total);
             setDownloadProgress(percent);
           }
         },
@@ -198,9 +177,9 @@ const getDocumentStats = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${
-        caseData.customerName || "case"
-      }_documents_${new Date().toISOString().split("T")[0]}.zip`;
+      a.download = `${caseData.customerName || "case"}_documents_${new Date()
+        .toISOString()
+        .split("T")[0]}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -219,11 +198,7 @@ const getDocumentStats = () => {
     }
   };
 
-  const hasCoApplicant =
-    !!(caseData?.applicant2Name && caseData.applicant2Name !== "");
-  const documentStats = getDocumentStats();
-
-  // -------- UI --------
+  // -------- Render Guards --------
   if (isLoading)
     return (
       <div className="loading-container">
@@ -256,6 +231,10 @@ const getDocumentStats = () => {
       </div>
     );
 
+  const hasCoApplicant = !!(caseData?.applicant2Name && caseData.applicant2Name !== "");
+  const documentStats = getDocumentStats();
+
+  // -------- UI --------
   return (
     <div className="view-case-container">
       {/* Progress Header */}
@@ -263,23 +242,19 @@ const getDocumentStats = () => {
         <div className="progress-header-content">
           <div className="progress-title-section">
             <h1 className="case-title">Loan Case Details</h1>
-            <p className="case-subtitle">
-              Complete all required fields to move forward
-            </p>
+            <p className="case-subtitle">Complete all required fields to move forward</p>
           </div>
 
           <div className="progress-display">
             <div className="progress-stats">
-            <span className="progress-percentage">{progress}% Complete</span>
-            <span className="file-count-badge">{documentStats.totalFiles} Files</span>
-            <span className="progress-pending">{100 - progress}% Pending</span>
-          </div>
+              <span className="progress-percentage">{progress}% Complete</span>
+              <span className="file-count-badge">{documentStats.totalFiles} Files</span>
+              <span className="progress-pending">{100 - progress}% Pending</span>
+            </div>
             <div className="progress-visual">
               <div className="progress-bar-wrapper">
                 <div
-                  className={`progress-fill ${
-                    progress === 100 ? "complete" : ""
-                  }`}
+                  className={`progress-fill ${progress === 100 ? "complete" : ""}`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -309,7 +284,6 @@ const getDocumentStats = () => {
             <div className="info-row">
               <label>Lead ID</label><span>{show(caseData.leadId)}</span>
             </div>
-            {/* ❌ Removed Lead Type + Sub Type here */}
             <div className="info-row">
               <label>Status</label>
               <span
@@ -347,40 +321,38 @@ const getDocumentStats = () => {
           </div>
         </div>
 
-       {/* Lead Information */}
-          <div className="info-card">
-            <div className="card-header">
-              <FiTrendingUp className="card-icon" />
-              <h3>Lead Information</h3>
-              <FiEdit className="edit-icon" onClick={goEdit} title="Edit" />
+        {/* Lead Information */}
+        <div className="info-card">
+          <div className="card-header">
+            <FiTrendingUp className="card-icon" />
+            <h3>Lead Information</h3>
+            <FiEdit className="edit-icon" onClick={goEdit} title="Edit" />
+          </div>
+          <div className="card-content">
+            <div className="info-row"><label>Lead Type</label><span>{show(caseData.leadType)}</span></div>
+            <div className="info-row"><label>Lead Sub Type</label><span>{show(caseData.subType)}</span></div>
+
+            {/* ✅ Fixed Channel Partner Display */}
+            <div className="info-row">
+              <label>Channel Partner</label>
+              <span>
+                {caseData.channelPartner ? (
+                  typeof caseData.channelPartner === 'object'
+                    ? (caseData.channelPartner.name || caseData.channelPartner._id || "-")
+                    : caseData.channelPartner
+                ) : "-"}
+              </span>
             </div>
-            <div className="card-content">
-              <div className="info-row"><label>Lead Type</label><span>{show(caseData.leadType)}</span></div>
-              <div className="info-row"><label>Lead Sub Type</label><span>{show(caseData.subType)}</span></div>
-              
-              {/* ✅ Fixed Channel Partner Display */}
-              <div className="info-row">
-                <label>Channel Partner</label>
-                <span>
-                  {caseData.channelPartner ? (
-                    typeof caseData.channelPartner === 'object' 
-                      ? caseData.channelPartner.name || caseData.channelPartner 
-                      : caseData.channelPartner
-                  ) : "-"}
-                </span>
-                </div>
-    
-            {/* ✅ Add Partner Contact if available */}
+
+            {/* ✅ Partner Contact if available */}
             {caseData.channelPartner && typeof caseData.channelPartner === 'object' && caseData.channelPartner.contact && (
               <div className="info-row">
                 <label>Partner Contact</label>
                 <span>{show(caseData.channelPartner.contact)}</span>
-                
               </div>
             )}
           </div>
         </div>
-
 
         {/* Applicant */}
         <div className="info-card">
@@ -440,7 +412,7 @@ const getDocumentStats = () => {
           </div>
         </div>
 
-                {/* Documents & KYC Uploads */}
+        {/* Documents & KYC Uploads */}
         <div className="info-card full-width">
           <div className="card-header">
             <FiPaperclip className="card-icon" />
@@ -494,7 +466,6 @@ const getDocumentStats = () => {
             )}
           </div>
         </div>
-
 
         {/* Notes */}
         <div className="info-card full-width">
