@@ -4,7 +4,7 @@ import Customer from "../models/Customer.js";
 import { auth } from "../middleware/auth.js";
 import { allowRoles } from "../middleware/roles.js";
 import { upload } from "../middleware/uploads.js";
-import { listWithPagination } from "../utils/paginate.js";
+import { listWithPagination as paginateCustomers } from "../utils/paginate_customers.js";
 import { logAction } from "../middleware/audit.js";
 
 const router = express.Router();
@@ -38,7 +38,7 @@ router.get("/", auth, async (req, res, next) => {
       searchQuery.status = status;
     }
 
-    const data = await listWithPagination(Customer, searchQuery, { page, limit }, [
+    const data = await paginateCustomers(Customer, searchQuery, { page, limit }, [
       { path: "channelPartner", select: "name email contact" },
     ]);
 
