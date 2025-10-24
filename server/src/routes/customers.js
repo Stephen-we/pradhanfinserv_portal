@@ -178,8 +178,6 @@ router.post("/", auth, allowRoles(["admin", "superadmin"]), async (req, res, nex
   }
 });
 
-// ... ALL YOUR OTHER ROUTES REMAIN EXACTLY THE SAME ...
-
 /* ================================
    ✅ LIST Customers (Search + Pagination + Filters)
 ================================ */

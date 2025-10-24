@@ -1,9 +1,6 @@
-// server/src/models/Case.js
 import mongoose from "mongoose";
 
-
 const CaseSchema = new mongoose.Schema(
-  
   {
     requirementAmount: { type: Number }, // comes from Lead at conversion time
 

@@ -1,4 +1,3 @@
-// server/src/routes/cases.js
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -45,7 +44,7 @@ const normalizeChannelPartner = (v) => {
 /* --------------------------------- routes --------------------------------- */
 
 //
-// ✅ List cases
+// ✅ List cases with completed tasks moved to last
 //
 router.get("/", auth, async (req, res, next) => {
   try {
@@ -81,7 +80,16 @@ router.get("/", auth, async (req, res, next) => {
       ]
     );
 
+    // 🔥 REORDER: Move completed tasks to end while maintaining pagination
     if (data?.items?.length) {
+      // Separate completed and incomplete tasks
+      const incompleteTasks = data.items.filter(item => item.task !== "Complete");
+      const completedTasks = data.items.filter(item => item.task === "Complete");
+      
+      // Combine with completed tasks at the end
+      data.items = [...incompleteTasks, ...completedTasks];
+      
+      // Map to add leadType
       data.items = data.items.map((item) => {
         const obj = item.toObject?.() || item;
         return { ...obj, leadType: obj.leadType || obj.leadId?.leadType || "" };
@@ -135,7 +143,7 @@ router.get("/:id/public", async (req, res, next) => {
 });
 
 //
-// ✅ Update case (auth) — keeps A’s upload/save logic + B’s security
+// ✅ Update case (auth) — with Complete task protection
 //
 router.put("/:id", auth, upload.array("documents"), async (req, res, next) => {
   try {
@@ -145,6 +153,13 @@ router.put("/:id", auth, upload.array("documents"), async (req, res, next) => {
 
     const body = req.body || {};
     const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+
+    // 🔥 PROTECTION: Prevent manual assignment of "Complete" task
+    if (body.task === "Complete" && prev.task !== "Complete") {
+      return res.status(403).json({ 
+        message: 'Cannot manually assign "Complete" task. Change customer status to "closed" instead.' 
+      });
+    }
 
     // 🔐 Restrict assignedTo to admin/superadmin
     const userRole = req.user?.role;
@@ -438,7 +453,7 @@ router.post("/export/request-otp", auth, async (req, res, next) => {
       await sendEmail(ownerEmail, "Export OTP", `Your OTP for data export is: ${code}`);
     }
 
-    res.json({ ok: true, message: "OTP sent to owner’s email." });
+    res.json({ ok: true, message: "OTP sent to owner's email." });
   } catch (e) {
     next(e);
   }
