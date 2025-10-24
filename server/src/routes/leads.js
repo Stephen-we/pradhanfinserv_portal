@@ -1,3 +1,4 @@
+// server/src/routes/leads.js
 import express from "express";
 import Lead from "../models/Lead.js";
 import Case from "../models/Case.js";
@@ -6,7 +7,6 @@ import { auth } from "../middleware/auth.js";
 import { allowRoles } from "../middleware/roles.js";
 import { listWithPagination } from "../utils/paginate.js";
 import { logAction } from "../middleware/audit.js";
-
 
 const router = express.Router();
 
@@ -40,7 +40,7 @@ router.get("/", auth, async (req, res, next) => {
       { path: "assignedTo", select: "name role" }
     );
 
-     // ✅ Log the update
+    // ✅ Log the update
     await logAction({
       req,
       action: "update_case",
@@ -147,53 +147,12 @@ router.patch(
         await lead.save();
       }
 
-      // ✅ CASE: reuse or create
-      let caseDoc = await Case.findOne({ leadId: lead.leadId });
-      if (!caseDoc) {
-        const validLoanTypes = [
-          "Home Loan",
-          "Personal Loan",
-          "Business Loan",
-          "Education Loan",
-          "Vehicle Loan",
-          "LAP",
-          "MSME",
-          "LRD",
-        ];
-        let chosenLoanType = lead.subType;
-        if (!validLoanTypes.includes(chosenLoanType)) chosenLoanType = "Home Loan";
-
-        caseDoc = await Case.create({
-          caseId: lead.leadId,
-          leadId: lead.leadId,
-          leadType: lead.leadType,
-          subType: lead.subType,
-          channelPartner: lead.channelPartner?._id || lead.channelPartner,
-          loanType: chosenLoanType,
-          status: "Pending",
-          requirementAmount: lead.requirementAmount ?? null,
-          amount: null, // sanctioned left empty initially
-          bank: lead.bank || "",
-          branch: lead.branch,
-          customerName: lead.name,
-          mobile: lead.mobile,
-          email: lead.email,
-          permanentAddress: lead.permanentAddress,
-          currentAddress: lead.currentAddress,
-          siteAddress: lead.siteAddress,
-          officeAddress: lead.officeAddress,
-          panNumber: lead.pan,
-          aadharNumber: lead.aadhar,
-          notes: lead.notes || "",
-        });
-      }
-
-      // ✅ CUSTOMER: reuse or create
+      // ✅ CUSTOMER: reuse or create first
       let customerDoc = await Customer.findOne({ customerId: lead.leadId });
       if (!customerDoc) {
         customerDoc = await Customer.create({
           customerId: lead.leadId,
-          leadId: lead._id, // ✅ Link the original lead
+          leadId: lead._id,
           name: lead.name,
           dob: lead.dob,
           mobile: lead.mobile,
@@ -213,15 +172,85 @@ router.patch(
           },
           notes: lead.notes || "",
         });
-      } else {
-        // ✅ Update missing link for existing customer
-        if (!customerDoc.leadId) {
-          customerDoc.leadId = lead._id;
-          await customerDoc.save();
-        }
+      } else if (!customerDoc.leadId) {
+        customerDoc.leadId = lead._id;
+        await customerDoc.save();
       }
 
-      console.log("✅ Customer linked to Lead:", customerDoc.leadId);
+      // ✅ CASE: reuse or create and ensure link with Customer
+      let caseDoc = await Case.findOne({ leadId: lead.leadId });
+
+      const validLoanTypes = [
+        "Home Loan",
+        "Personal Loan",
+        "Business Loan",
+        "Education Loan",
+        "Vehicle Loan",
+        "LAP",
+        "MSME",
+        "LRD",
+      ];
+      let chosenLoanType = lead.subType;
+      if (!validLoanTypes.includes(chosenLoanType)) chosenLoanType = "Home Loan";
+
+      if (!caseDoc) {
+        caseDoc = await Case.create({
+          caseId: lead.leadId,
+          leadId: lead.leadId,
+          leadType: lead.leadType,
+          subType: lead.subType,
+          channelPartner: lead.channelPartner?._id || lead.channelPartner,
+          loanType: chosenLoanType,
+          status: "pending-documents",
+          requirementAmount: lead.requirementAmount ?? null,
+          amount: null,
+          bank: lead.bank || "",
+          branch: lead.branch,
+          customer: customerDoc._id, // ✅ LINK HERE
+          customerName: lead.name,
+          mobile: lead.mobile,
+          email: lead.email,
+          permanentAddress: lead.permanentAddress,
+          currentAddress: lead.currentAddress,
+          siteAddress: lead.siteAddress,
+          officeAddress: lead.officeAddress,
+          panNumber: lead.pan,
+          aadharNumber: lead.aadhar,
+          notes: lead.notes || "",
+        });
+      } else {
+        // ✅ Ensure linked to Customer
+        if (!caseDoc.customer || String(caseDoc.customer) !== String(customerDoc._id)) {
+          caseDoc.customer = customerDoc._id;
+        }
+        // update missing info (non-breaking)
+        caseDoc.leadType = caseDoc.leadType || lead.leadType;
+        caseDoc.subType = caseDoc.subType || lead.subType;
+        caseDoc.customerName = caseDoc.customerName || lead.name;
+        caseDoc.mobile = caseDoc.mobile || lead.mobile;
+        caseDoc.email = caseDoc.email || lead.email;
+        if (!caseDoc.bank && lead.bank) caseDoc.bank = lead.bank;
+        if (!caseDoc.branch && lead.branch) caseDoc.branch = lead.branch;
+        await caseDoc.save();
+      }
+
+      console.log("✅ Case linked to Customer:", {
+        caseId: caseDoc.caseId,
+        customer: customerDoc._id.toString(),
+      });
+
+      await logAction({
+        req,
+        action: "convert_lead_to_case_customer",
+        entityType: "Lead",
+        entityId: lead._id,
+        meta: {
+          leadId: lead.leadId,
+          caseId: caseDoc.caseId,
+          customerId: customerDoc.customerId,
+          customerObjectId: customerDoc._id,
+        },
+      });
 
       return res.json({
         message: "Lead converted successfully",
