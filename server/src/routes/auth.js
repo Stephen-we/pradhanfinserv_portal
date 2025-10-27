@@ -20,9 +20,19 @@ const OWNER_PHONE = process.env.OWNER_PHONE || "+910000000000";
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 const OTP_EXPIRY_SECONDS = Number(process.env.OTP_EXPIRY_SECONDS || 300);
 
+// 🔧 helper: verify OTP against any of the allowed purposes
+function verifyAgainstPurposes({ purposes, code }) {
+  for (const p of purposes) {
+    const v = verifyOTP({ purpose: p, identifier: "owner", code: String(code) });
+    if (v.ok) return { ok: true, purpose: p };
+    // if not_found/mismatch/expired, try next purpose
+  }
+  return { ok: false, reason: "mismatch_or_not_found" };
+}
+
 /* -----------------------------
    Request OTP to OWNER (generic)
-   body: { purpose: "signup" | "create_user" | "forgot_password" | ... }
+   body: { purpose: "signup" | "create_admin" | "create_user" | "forgot_..." }
 ------------------------------*/
 router.post("/request-otp", async (req, res, next) => {
   try {
@@ -58,30 +68,31 @@ router.post("/request-otp", async (req, res, next) => {
 });
 
 /* -----------------------------
-   Signup (OTP to owner) => creates ADMIN
+   Signup / Create Admin (OTP to owner) => creates ADMIN
+   Accept both purposes: "signup" and "create_admin"
 ------------------------------*/
-router.post("/signup", async (req, res, next) => {
+async function handleCreateAdmin(req, res, next) {
   try {
-    const { name, email, password, otp } = req.body;
+    const { name, email, password, otp, purpose } = req.body;
     if (!name || !email || !password || !otp) {
       return res
         .status(400)
         .json({ message: "name, email, password, otp are required." });
     }
 
-    // ✅ Verify OTP (purpose must match request-otp)
-    const v = verifyOTP({ purpose: "signup", identifier: "owner", code: String(otp) });
-    console.log("🔍 Verifying signup OTP:", v);
+    // Purposes we accept for this flow (frontend may send either)
+    const acceptedPurposes = purpose
+      ? [String(purpose)]
+      : ["signup", "create_admin"];
+
+    // ✅ Verify OTP against any accepted purpose
+    const v = verifyAgainstPurposes({ purposes: acceptedPurposes, code: otp });
+    console.log("🔍 Verifying admin-create OTP:", v, "accepted:", acceptedPurposes);
 
     if (!v.ok) {
-      const map = {
-        not_found: "OTP not found",
-        expired: "OTP expired",
-        mismatch: "Invalid OTP",
-      };
       return res
         .status(401)
-        .json({ message: map[v.reason] || "OTP verification failed" });
+        .json({ message: "Invalid or expired OTP" });
     }
 
     const exists = await User.findOne({ email });
@@ -100,7 +111,7 @@ router.post("/signup", async (req, res, next) => {
       action: "signup_admin",
       entityType: "User",
       entityId: user._id,
-      meta: { email: user.email },
+      meta: { email: user.email, usedPurpose: v.purpose },
     });
 
     const token = sign(user);
@@ -114,10 +125,14 @@ router.post("/signup", async (req, res, next) => {
       },
     });
   } catch (e) {
-    console.error("❌ Signup error:", e);
+    console.error("❌ Signup/Create-Admin error:", e);
     next(e);
   }
-});
+}
+
+// Route alias: support both /signup and /create-admin
+router.post("/signup", handleCreateAdmin);
+router.post("/create-admin", handleCreateAdmin);
 
 /* -----------------------------
    Login
@@ -154,7 +169,7 @@ router.post("/login", async (req, res, next) => {
 });
 
 /* -----------------------------
-   Forgot Password (OTP via email)
+   Forgot Password (OTP via email to owner)
 ------------------------------*/
 router.post("/forgot-password/request-otp", async (req, res, next) => {
   try {
@@ -198,14 +213,9 @@ router.post("/forgot-password/verify", async (req, res, next) => {
       code: String(otp),
     });
     if (!v.ok) {
-      const map = {
-        not_found: "OTP not found",
-        expired: "OTP expired",
-        mismatch: "Invalid OTP",
-      };
       return res
         .status(401)
-        .json({ message: map[v.reason] || "OTP verification failed" });
+        .json({ message: "Invalid or expired OTP" });
     }
 
     const user = await User.findOne({ email }).select("+password");

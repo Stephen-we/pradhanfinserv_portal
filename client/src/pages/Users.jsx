@@ -1,4 +1,3 @@
-// client/src/pages/Users.jsx
 import React, { useEffect, useState } from "react";
 import API from "../services/api";
 import * as XLSX from "xlsx";
@@ -11,13 +10,9 @@ export default function Users() {
     email: "",
     password: "",
     role: "officer",
-    otp: "",
   });
   const [modal, setModal] = useState({ type: null, user: null });
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
 
   const load = () => API.get("/users").then((r) => setItems(r.data));
 
@@ -25,25 +20,10 @@ export default function Users() {
     load();
   }, []);
 
-  // ✅ Step 1: Request OTP
-  const requestOtp = async () => {
-    setSendingOtp(true);
-    setOtpVerified(false);
-    try {
-      await API.post("/auth/request-otp", { purpose: "create_user" });
-      alert("OTP sent to owner’s phone.");
-      setOtpSent(true);
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to send OTP");
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  // ✅ Step 2: Create user (send OTP + purpose)
+  // ✅ Create user (no OTP)
   const create = async () => {
-    if (!form.otp) {
-      alert("Please enter OTP before creating user.");
+    if (!form.name || !form.email || !form.password) {
+      alert("Please fill all fields before creating user.");
       return;
     }
     setLoading(true);
@@ -53,33 +33,14 @@ export default function Users() {
         email: form.email,
         password: form.password,
         role: form.role,
-        otp: form.otp,
-        purpose: "create_user",
       });
       alert("User created successfully!");
-      setForm({ name: "", email: "", password: "", role: "officer", otp: "" });
-      setOtpSent(false);
-      setOtpVerified(false);
+      setForm({ name: "", email: "", password: "", role: "officer" });
       load();
     } catch (err) {
       alert(err.response?.data?.message || "Error creating user");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // ✅ Verify OTP (optional feedback)
-  const verifyOtp = async () => {
-    if (!form.otp) {
-      alert("Please enter the OTP to verify.");
-      return;
-    }
-    try {
-      // simulate quick local validation (no backend call needed here, backend rechecks)
-      setOtpVerified(true);
-      alert("OTP verified successfully!");
-    } catch {
-      setOtpVerified(false);
     }
   };
 
@@ -98,18 +59,11 @@ export default function Users() {
     }
   };
 
-  // ✅ Confirm delete
+  // ✅ Confirm delete (no OTP)
   const confirmDelete = async () => {
     setLoading(true);
     try {
-      const otp = prompt("Enter OTP sent to owner phone:");
-      if (!otp) {
-        alert("OTP is required.");
-        return setLoading(false);
-      }
-      await API.delete(`/users/${modal.user._id}`, {
-        data: { otp, purpose: "create_user" },
-      });
+      await API.delete(`/users/${modal.user._id}`);
       alert("User deleted successfully!");
       setModal({ type: null, user: null });
       load();
@@ -190,41 +144,6 @@ export default function Users() {
             <option value="officer">officer</option>
             <option value="viewer">viewer</option>
           </select>
-
-          {/* OTP section */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input
-              className="input"
-              placeholder="Enter OTP"
-              value={form.otp}
-              onChange={(e) => {
-                setForm({ ...form, otp: e.target.value });
-                setOtpVerified(false);
-              }}
-              style={{ width: 120 }}
-            />
-
-            <button
-              className="btn secondary"
-              onClick={requestOtp}
-              disabled={sendingOtp}
-            >
-              {sendingOtp ? "Sending..." : otpSent ? "Resend OTP" : "Send OTP"}
-            </button>
-
-            <button
-              className="btn"
-              style={{ background: "#28a745" }}
-              onClick={verifyOtp}
-              disabled={!form.otp}
-            >
-              Verify
-            </button>
-
-            {otpVerified && (
-              <span style={{ color: "green", fontWeight: "bold" }}>✅ OTP Verified</span>
-            )}
-          </div>
 
           <button className="btn" onClick={create} disabled={loading}>
             {loading ? "Creating..." : "Create User"}

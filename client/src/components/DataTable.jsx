@@ -1,5 +1,5 @@
-// client/src/components/DataTable.jsx
 import React from "react";
+import Pagination from "./Pagination";
 
 export default function DataTable({
   columns = [],
@@ -19,7 +19,6 @@ export default function DataTable({
           placeholder="Search..."
           onChange={(e) => onSearch?.(e.target.value)}
         />
-        {/* 🧹 Removed old unprotected Export button */}
         {extraToolbar}
       </div>
 
@@ -35,7 +34,10 @@ export default function DataTable({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} style={{ textAlign: "center", padding: 20 }}>
+              <td
+                colSpan={columns.length}
+                style={{ textAlign: "center", padding: 20 }}
+              >
                 No records found
               </td>
             </tr>
@@ -57,7 +59,10 @@ export default function DataTable({
         </tbody>
       </table>
 
-      {/* Pager */}
+      {/* --- 🔹 Numeric Pagination --- */}
+      <Pagination page={page} pages={pages} onPage={onPage} />
+
+      {/* --- 🔹 Legacy Prev/Next Pager (kept for backward compatibility) --- */}
       <div className="pager">
         <button
           className="icon-btn"

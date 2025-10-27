@@ -1,3 +1,4 @@
+// server/src/routes/dashboard.js
 import express from "express";
 import Lead from "../models/Lead.js";
 import Case from "../models/Case.js";

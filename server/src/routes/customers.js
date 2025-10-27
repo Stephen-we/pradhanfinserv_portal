@@ -1,3 +1,4 @@
+//server/src/routes/customers.js
 import express from "express";
 import Customer from "../models/Customer.js";
 import Case from "../models/Case.js";

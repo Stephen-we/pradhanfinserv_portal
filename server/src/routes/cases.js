@@ -44,23 +44,36 @@ const normalizeChannelPartner = (v) => {
 /* --------------------------------- routes --------------------------------- */
 
 //
-// ✅ List cases with completed tasks moved to last
+// ✅ List cases with enhanced pagination and filters
 //
 router.get("/", auth, async (req, res, next) => {
   try {
-    const { q, page = 1, limit = 10, assignedTo, task } = req.query;
+    const { 
+      q, 
+      page = 1, 
+      limit = 10, 
+      assignedTo, 
+      task,
+      status,
+      leadType,
+      bank,
+      branch 
+    } = req.query;
 
     const cond = {};
 
+    // Search query
     if (q) {
       cond.$or = [
         { caseId: { $regex: q, $options: "i" } },
         { leadType: { $regex: q, $options: "i" } },
         { customerName: { $regex: q, $options: "i" } },
         { mobile: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } },
       ];
     }
 
+    // Filters
     if (assignedTo && typeof assignedTo === "string" && assignedTo.trim() !== "") {
       if (mongoose.isValidObjectId(assignedTo)) {
         cond.assignedTo = new mongoose.Types.ObjectId(assignedTo);
@@ -68,11 +81,23 @@ router.get("/", auth, async (req, res, next) => {
     }
 
     if (task && typeof task === "string" && task.trim() !== "") cond.task = task;
+    if (status && typeof status === "string" && status.trim() !== "") cond.status = status;
+    if (leadType && typeof leadType === "string" && leadType.trim() !== "") cond.leadType = leadType;
+    if (bank && typeof bank === "string" && bank.trim() !== "") cond.bank = bank;
+    if (branch && typeof branch === "string" && branch.trim() !== "") cond.branch = branch;
 
+    // Parse pagination parameters
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.max(1, parseInt(limit));
+    
     const data = await listWithPagination(
       Case,
       cond,
-      { page, limit, sort: { createdAt: -1 } },
+      { 
+        page: pageNum, 
+        limit: limitNum, 
+        sort: { createdAt: -1 } 
+      },
       [
         { path: "assignedTo", select: "name role email", model: "User" },
         { path: "channelPartner", select: "name contact email", model: "ChannelPartner" },
@@ -82,7 +107,6 @@ router.get("/", auth, async (req, res, next) => {
 
     // 🔥 REORDER: Move completed tasks to end while maintaining pagination
     if (data?.items?.length) {
-      // Separate completed and incomplete tasks
       const incompleteTasks = data.items.filter(item => item.task !== "Complete");
       const completedTasks = data.items.filter(item => item.task === "Complete");
       
@@ -92,11 +116,38 @@ router.get("/", auth, async (req, res, next) => {
       // Map to add leadType
       data.items = data.items.map((item) => {
         const obj = item.toObject?.() || item;
-        return { ...obj, leadType: obj.leadType || obj.leadId?.leadType || "" };
+        return { 
+          ...obj, 
+          leadType: obj.leadType || obj.leadId?.leadType || "" 
+        };
       });
     }
 
-    res.json(data);
+    // 🔥 ENHANCED PAGINATION RESPONSE
+    const totalPages = Math.ceil(data.total / limitNum);
+    
+    res.json({
+      ...data,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: totalPages,
+        totalItems: data.total,
+        itemsPerPage: limitNum,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1,
+        nextPage: pageNum < totalPages ? pageNum + 1 : null,
+        prevPage: pageNum > 1 ? pageNum - 1 : null
+      },
+      filters: {
+        search: q || '',
+        assignedTo: assignedTo || '',
+        task: task || '',
+        status: status || '',
+        leadType: leadType || '',
+        bank: bank || '',
+        branch: branch || ''
+      }
+    });
   } catch (e) {
     console.error("❌ Error loading cases:", e);
     next(e);

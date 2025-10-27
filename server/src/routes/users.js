@@ -5,7 +5,6 @@ import User from "../models/User.js";
 import { auth } from "../middleware/auth.js";
 import { allowRoles } from "../middleware/roles.js";
 import { logAction } from "../middleware/audit.js";
-import { requireOwnerOtp } from "../middleware/requireOwnerOtp.js";
 
 const router = express.Router();
 const DEV_EMAIL = "stephen@gmail.com"; // 🔒 Developer protected account
@@ -18,8 +17,8 @@ function protectDevAccount(target, res) {
   return null;
 }
 
-// ✅ Create user (Admin / Superadmin + OTP)
-router.post("/", auth, allowRoles(["admin", "superadmin"]), requireOwnerOtp("purpose"), async (req, res, next) => {
+// ✅ Create user (Admin / Superadmin) — NO OTP
+router.post("/", auth, allowRoles(["admin", "superadmin"]), async (req, res, next) => {
   try {
     const { name, email, password, role = "officer" } = req.body;
     if (!name || !email || !password)
@@ -36,7 +35,7 @@ router.post("/", auth, allowRoles(["admin", "superadmin"]), requireOwnerOtp("pur
       action: "create_user",
       entityType: "User",
       entityId: user._id,
-      meta: { email: user.email, role: user.role }
+      meta: { email: user.email, role: user.role },
     });
 
     res.status(201).json({ ok: true, id: user._id });
@@ -71,7 +70,7 @@ router.patch("/:id/role", auth, allowRoles(["admin", "superadmin"]), async (req,
       action: "update_user_role",
       entityType: "User",
       entityId: target._id,
-      meta: { email: target.email, newRole: target.role }
+      meta: { email: target.email, newRole: target.role },
     });
 
     res.json({
@@ -79,7 +78,7 @@ router.patch("/:id/role", auth, allowRoles(["admin", "superadmin"]), async (req,
       name: target.name,
       email: target.email,
       role: target.role,
-      isActive: target.isActive
+      isActive: target.isActive,
     });
   } catch (e) {
     next(e);
@@ -102,7 +101,7 @@ router.patch("/:id/active", auth, allowRoles(["admin", "superadmin"]), async (re
       action: "toggle_user_active",
       entityType: "User",
       entityId: target._id,
-      meta: { email: target.email, isActive: target.isActive }
+      meta: { email: target.email, isActive: target.isActive },
     });
 
     res.json({
@@ -110,7 +109,7 @@ router.patch("/:id/active", auth, allowRoles(["admin", "superadmin"]), async (re
       name: target.name,
       email: target.email,
       role: target.role,
-      isActive: target.isActive
+      isActive: target.isActive,
     });
   } catch (e) {
     next(e);
@@ -133,7 +132,7 @@ router.patch("/:id/password", auth, allowRoles(["admin", "superadmin"]), async (
       action: "reset_user_password_by_admin",
       entityType: "User",
       entityId: target._id,
-      meta: { email: target.email }
+      meta: { email: target.email },
     });
 
     res.json({ ok: true });
@@ -142,7 +141,7 @@ router.patch("/:id/password", auth, allowRoles(["admin", "superadmin"]), async (
   }
 });
 
-// ✅ Edit user (name/email) (Admin / Superadmin)
+// ✅ Edit user (Admin / Superadmin)
 router.patch("/:id", auth, allowRoles(["admin", "superadmin"]), async (req, res, next) => {
   try {
     const { name, email } = req.body;
@@ -159,7 +158,7 @@ router.patch("/:id", auth, allowRoles(["admin", "superadmin"]), async (req, res,
       action: "update_user",
       entityType: "User",
       entityId: target._id,
-      meta: { email: target.email }
+      meta: { email: target.email },
     });
 
     res.json({
@@ -167,15 +166,15 @@ router.patch("/:id", auth, allowRoles(["admin", "superadmin"]), async (req, res,
       name: target.name,
       email: target.email,
       role: target.role,
-      isActive: target.isActive
+      isActive: target.isActive,
     });
   } catch (e) {
     next(e);
   }
 });
 
-// ✅ Delete user (Admin / Superadmin + OTP)
-router.delete("/:id", auth, allowRoles(["admin", "superadmin"]), requireOwnerOtp("purpose"), async (req, res, next) => {
+// ✅ Delete user (Admin / Superadmin) — NO OTP
+router.delete("/:id", auth, allowRoles(["admin", "superadmin"]), async (req, res, next) => {
   try {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found" });
@@ -188,7 +187,7 @@ router.delete("/:id", auth, allowRoles(["admin", "superadmin"]), requireOwnerOtp
       action: "delete_user",
       entityType: "User",
       entityId: req.params.id,
-      meta: { email: target.email }
+      meta: { email: target.email },
     });
 
     res.json({ ok: true });
@@ -197,16 +196,14 @@ router.delete("/:id", auth, allowRoles(["admin", "superadmin"]), requireOwnerOtp
   }
 });
 
-    // ✅ Public-safe route: Get minimal user info (for case assignment display)
-    router.get("/public", auth, async (req, res, next) => {
-      try {
-        // Fetch only minimal fields (no passwords, no admin-only data)
-        const users = await User.find({}, "name email role isActive");
-        res.json(users);
-      } catch (e) {
-        next(e);
-      }
-    });
-
+// ✅ Public-safe route
+router.get("/public", auth, async (req, res, next) => {
+  try {
+    const users = await User.find({}, "name email role isActive");
+    res.json(users);
+  } catch (e) {
+    next(e);
+  }
+});
 
 export default router;

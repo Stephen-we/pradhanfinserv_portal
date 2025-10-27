@@ -27,7 +27,7 @@ export default function CreateAdmin() {
   const handleSendOtp = async () => {
     setLoading(true);
     try {
-      await API.post("/auth/request-otp", { purpose: "signup" });
+      await API.post("/auth/request-otp", { purpose: "create_admin" }); // ✅ fixed purpose
       alert("✅ OTP sent to owner’s email. Please check your inbox.");
       setStep(2);
       setCooldown(30);
@@ -38,19 +38,11 @@ export default function CreateAdmin() {
     }
   };
 
-  // 🔹 Step 2: Verify OTP & show create form
+  // 🔹 Step 2: Verify OTP & show create form (frontend only visual step)
   const handleVerifyOtp = async () => {
     if (!form.otp) return alert("Please enter OTP");
-    setLoading(true);
-    try {
-      // Backend verifies OTP during signup itself, so this step just moves forward
-      alert("✅ OTP verified successfully.");
-      setStep(3);
-    } catch (err) {
-      alert(err.response?.data?.message || "OTP verification failed");
-    } finally {
-      setLoading(false);
-    }
+    alert("✅ OTP verified successfully.");
+    setStep(3);
   };
 
   // 🔹 Step 3: Create Admin
@@ -60,7 +52,11 @@ export default function CreateAdmin() {
       return alert("Please fill all fields.");
     setLoading(true);
     try {
-      await API.post("/auth/signup", form);
+      // ✅ send correct purpose field for backend validation
+      await API.post("/auth/create-admin", {
+        ...form,
+        purpose: "create_admin",
+      });
       alert("🎉 Admin created successfully!");
       navigate("/login");
     } catch (err) {
@@ -75,7 +71,7 @@ export default function CreateAdmin() {
     if (cooldown > 0) return;
     setLoading(true);
     try {
-      await API.post("/auth/request-otp", { purpose: "signup" });
+      await API.post("/auth/request-otp", { purpose: "create_admin" }); // ✅ fixed
       alert("✅ OTP resent to owner’s email.");
       setCooldown(30);
     } catch (err) {
@@ -90,6 +86,7 @@ export default function CreateAdmin() {
       <div style={cardStyle}>
         <h2 style={titleStyle}>Create Admin</h2>
 
+        {/* STEP 1 */}
         {step === 1 && (
           <>
             <p style={{ textAlign: "center", marginBottom: 20 }}>
@@ -104,11 +101,14 @@ export default function CreateAdmin() {
               {loading ? "Sending..." : "Send OTP"}
             </button>
             <div style={footerStyle}>
-              <Link to="/login" className="link">← Back to Login</Link>
+              <Link to="/login" className="link">
+                ← Back to Login
+              </Link>
             </div>
           </>
         )}
 
+        {/* STEP 2 */}
         {step === 2 && (
           <>
             <input
@@ -124,7 +124,7 @@ export default function CreateAdmin() {
               disabled={loading}
               style={btnStyle}
             >
-              {loading ? "Verifying..." : "Verify OTP"}
+              Verify OTP
             </button>
 
             <button
@@ -142,11 +142,14 @@ export default function CreateAdmin() {
             </button>
 
             <div style={footerStyle}>
-              <Link to="/login" className="link">← Back to Login</Link>
+              <Link to="/login" className="link">
+                ← Back to Login
+              </Link>
             </div>
           </>
         )}
 
+        {/* STEP 3 */}
         {step === 3 && (
           <form onSubmit={handleCreateAdmin}>
             <input
@@ -182,7 +185,9 @@ export default function CreateAdmin() {
             </button>
 
             <div style={footerStyle}>
-              <Link to="/login" className="link">← Back to Login</Link>
+              <Link to="/login" className="link">
+                ← Back to Login
+              </Link>
             </div>
           </form>
         )}
