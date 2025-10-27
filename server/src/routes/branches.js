@@ -111,4 +111,31 @@ router.get("/banks/:bankName/branches", auth, async (req, res, next) => {
   }
 });
 
+// ✅ Export: Request OTP
+//
+router.post("/export/request-otp", auth, async (req, res, next) => {
+  try {
+    const result = await requestExportOtp(req, "export_leads");
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+});
+
+//
+// ✅ Export: Verify OTP and Download Data
+//
+router.post("/export/verify", auth, async (req, res, next) => {
+  try {
+    const { otp } = req.body;
+    const check = await verifyExportOtp("export_leads", otp);
+    if (!check.ok) return res.status(401).json({ message: check.message });
+
+    const items = await Lead.find().select("leadId name mobile loanType status createdAt");
+    res.json({ ok: true, items });
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default router;

@@ -1,10 +1,10 @@
-// client/src/pages/leads/FreePool.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../services/api";
 import DataTable from "../../components/DataTable";
 import "../../styles/DataTable.css";
 import { FiTrash2 } from "react-icons/fi";
+import ExportButton from "../../components/ExportButton"; // ✅ Correct import path
 
 // ✅ Compact Aging Helper
 function timeAgo(date) {
@@ -38,6 +38,7 @@ function FreePool() {
   });
   const role = JSON.parse(localStorage.getItem("user") || "{}").role || "";
 
+  // ✅ Load Leads
   const load = () => {
     API.get("/leads", {
       params: { page: state.page, q: state.q, status: "free_pool" },
@@ -60,6 +61,7 @@ function FreePool() {
     load();
   }, [state.page, state.q]);
 
+  // ✅ Delete Lead
   const deleteLead = async (id) => {
     if (!window.confirm("Are you sure you want to delete this lead?")) return;
     try {
@@ -70,6 +72,7 @@ function FreePool() {
     }
   };
 
+  // ✅ Update Workflow Status
   const updateWorkflow = async (id, newStatus) => {
     try {
       await API.patch(`/leads/${id}`, { workflowStatus: newStatus });
@@ -83,17 +86,14 @@ function FreePool() {
   const filteredItems = useMemo(() => {
     let items = state.items;
 
-    // filter by leadType
     if (filters.leadType) {
       items = items.filter((l) => l.leadType === filters.leadType);
     }
 
-    // filter by subType
     if (filters.subType) {
       items = items.filter((l) => l.subType === filters.subType);
     }
 
-    // filter by workflowStatus
     if (filters.workflowStatus) {
       items = items.filter((l) => l.workflowStatus === filters.workflowStatus);
     }
@@ -126,6 +126,7 @@ function FreePool() {
 
   return (
     <div>
+      {/* ✅ Header Section */}
       <header
         style={{
           display: "flex",
@@ -135,14 +136,26 @@ function FreePool() {
         }}
       >
         <h1>Free Pool Leads</h1>
-        <button className="btn" onClick={() => navigate("/leads/new")}>
-          + Add Lead
-        </button>
+
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {/* ✅ Export Button for Leads */}
+          <ExportButton endpoint="/leads" filename="leads_export" />
+
+          {/* Existing Add Lead Button */}
+          <button className="btn" onClick={() => navigate("/leads/new")}>
+            + Add Lead
+          </button>
+        </div>
       </header>
 
       {/* ✅ Filters Section */}
       <div
-        style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}
+        style={{
+          display: "flex",
+          gap: "10px",
+          marginBottom: "15px",
+          flexWrap: "wrap",
+        }}
       >
         <select
           value={filters.leadType}
@@ -199,6 +212,7 @@ function FreePool() {
         )}
       </div>
 
+      {/* ✅ Table Section */}
       <DataTable
         columns={[
           {
