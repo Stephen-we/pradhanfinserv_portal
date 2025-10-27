@@ -35,7 +35,6 @@ let allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
-// ✅ Add Cloudflare + local domains if not already included
 const defaultOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
@@ -49,7 +48,10 @@ for (const origin of defaultOrigins) {
   if (!allowedOrigins.includes(origin)) allowedOrigins.push(origin);
 }
 
-// ✅ CORS setup with logging for unauthorized domains
+// Trust proxy (so req.ip works correctly behind reverse proxies / Cloudflare)
+app.set("trust proxy", true);
+
+// ✅ CORS with logging for unauthorized domains
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -69,17 +71,61 @@ app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
 
-// ---- Database ----
-try {
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log("✅ MongoDB connected");
-} catch (err) {
-  console.error("❌ MongoDB connection failed:", err.message);
-  process.exit(1);
+// ---------------- MongoDB Connection (retrying, short timeouts) ----------------
+const mongoUri =
+  process.env.MONGODB_URI ||
+  process.env.MONGO_URI ||
+  "mongodb://127.0.0.1:27017/pradhanfinserv";
+
+// Mask credentials in logs
+const maskedUri = (mongoUri || "").replace(/\/\/([^:]+):([^@]+)@/, "//<user>:<pass>@");
+console.log("🔎 Using Mongo URI:", maskedUri);
+
+async function connectWithRetry({
+  uri = mongoUri,
+  maxRetries = 8,
+  initialDelayMs = 1000,
+} = {}) {
+  if (!uri) {
+    console.error("❌ No Mongo URI provided. Set MONGODB_URI or MONGO_URI in server/.env");
+    process.exit(1);
+  }
+
+  let attempt = 0;
+  let delay = initialDelayMs;
+
+  while (attempt < maxRetries) {
+    try {
+      await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 8000,
+        connectTimeoutMS: 8000,
+        socketTimeoutMS: 20000,
+        maxPoolSize: 10,
+      });
+      console.log("✅ MongoDB connected");
+      return;
+    } catch (err) {
+      attempt += 1;
+      console.error(`⚠️ Mongo connect attempt ${attempt} failed: ${err.message}`);
+      if (attempt >= maxRetries) {
+        console.error("❌ Giving up after maximum retries.");
+        process.exit(1);
+      }
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay * 1.8, 10000);
+    }
+  }
 }
 
-// ---- Root ----
+mongoose.connection.on("error", (e) => console.error("❌ Mongo error:", e));
+mongoose.connection.on("disconnected", () => console.warn("⚠️ Mongo disconnected"));
+
+// ---- Root & Health ----
 app.get("/", (req, res) => res.json({ ok: true, service: "DSA CRM API" }));
+app.get("/health", (req, res) => {
+  const state = mongoose.connection.readyState; // 0=disconnected 1=connected 2=connecting 3=disconnecting
+  res.status(state === 1 ? 200 : 503).json({ ok: state === 1, state });
+});
 
 // ---- API Routes ----
 app.use("/api/auth", authRoutes);
@@ -100,10 +146,12 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // ---- Error Handler ----
 app.use((err, req, res, next) => {
-  console.error("❌ Error:", err.stack);
+  console.error("❌ Error:", err.stack || err);
   res.status(err.status || 500).json({ message: err.message || "Server error" });
 });
 
-// ---- Start Server ----
+// ---- Start Server AFTER Mongo connects ----
 const PORT = process.env.PORT || 5000;
+
+await connectWithRetry();
 app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
